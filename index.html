@@ -6,7 +6,7 @@
     <title>Acoustic Site Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         
         :root {
             --accent-violet: #8b5cf6;
@@ -18,6 +18,7 @@
             background-color: var(--ui-bg);
             color: #f3f4f6;
             font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
         canvas {
@@ -122,6 +123,18 @@
                             class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
                             oninput="updateGlobalScale(this.value, 'input')">
                     </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Map Brightness (%)</label>
+                            <input type="number" id="brightnessInput" min="0" max="100" value="40" 
+                                class="w-12 bg-black border border-gray-700 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
+                                oninput="updateMapBrightness(this.value, 'slider')">
+                        </div>
+                        <input type="range" id="brightnessSlider" min="0" max="100" value="40" 
+                            class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                            oninput="updateMapBrightness(this.value, 'input')">
+                    </div>
                     
                     <div>
                         <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Intensity Scheme</label>
@@ -142,15 +155,15 @@
                 <div class="grid grid-cols-3 gap-2">
                     <button onclick="setMode('source')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="source">
                         <span class="text-xl">🔊</span>
-                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Speaker</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70">Speaker</span>
                     </button>
                     <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="barrier">
                         <span class="text-xl">🧱</span>
-                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Barrier</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70">Barrier</span>
                     </button>
                     <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="delete">
                         <span class="text-xl text-blue-400">🗑️</span>
-                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Delete</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70">Delete</span>
                     </button>
                 </div>
             </section>
@@ -161,46 +174,46 @@
                 </h2>
                 <div class="grid grid-cols-3 gap-2">
                     <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="camping">
-                        <span class="text-lg">⛺</span><span class="text-[8px] mt-1 font-bold uppercase">Camping</span>
+                        <span class="text-lg">⛺</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Camping</span>
                     </button>
                     <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="campervans">
-                        <span class="text-lg">🚐</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Caravans</span>
+                        <span class="text-lg">🚐</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Caravans</span>
                     </button>
                     <button onclick="setMode('registration')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="registration">
-                        <span class="text-lg">📝</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Registration</span>
+                        <span class="text-lg">📝</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Registration</span>
                     </button>
                     <button onclick="setMode('welfare')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="welfare">
-                        <span class="text-lg">🏠</span><span class="text-[8px] mt-1 font-bold uppercase">Welfare</span>
+                        <span class="text-lg">🏠</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Welfare</span>
                     </button>
                     <button onclick="setMode('stage')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="stage">
-                        <span class="text-lg">🎸</span><span class="text-[8px] mt-1 font-bold uppercase">Stage</span>
+                        <span class="text-lg">🎸</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Stage</span>
                     </button>
                     <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="dancefloor">
-                        <span class="text-lg">💃</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Dance</span>
+                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Dance</span>
                     </button>
                     <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="bar">
-                        <span class="text-lg">🍺</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Bar</span>
+                        <span class="text-lg">🍺</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Bar</span>
                     </button>
                     <button onclick="setMode('chill')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="chill">
-                        <span class="text-lg">🧘</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Chillout</span>
+                        <span class="text-lg">🧘</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Chillout</span>
                     </button>
                     <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="kitchen">
-                        <span class="text-lg">🍳</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Kitchen</span>
+                        <span class="text-lg">🍳</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Kitchen</span>
                     </button>
                     <button onclick="setMode('workshops')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="workshops">
-                        <span class="text-lg">🔨</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Workshops</span>
+                        <span class="text-lg">🔨</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Workshops</span>
                     </button>
                     <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="fire">
-                        <span class="text-lg">🔥</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Firepit</span>
+                        <span class="text-lg">🔥</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Firepit</span>
                     </button>
                     <button onclick="setMode('showers')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="showers">
-                        <span class="text-lg">🚿</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Showers</span>
+                        <span class="text-lg">🚿</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Showers</span>
                     </button>
                     <button onclick="setMode('toilets')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="toilets">
-                        <span class="text-lg">🚽</span><span class="text-[8px] mt-1 font-bold uppercase opacity-60 text-center leading-tight">Toilets</span>
+                        <span class="text-lg">🚽</span><span class="text-[8px] font-bold uppercase leading-tight text-center opacity-60">Toilets</span>
                     </button>
                     <button onclick="setMode('seating')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="seating">
-                        <span class="text-lg">🪑</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Seating</span>
+                        <span class="text-lg">🪑</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Seating</span>
                     </button>
                 </div>
             </section>
@@ -209,7 +222,7 @@
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-white"></span> Inspector
                 </h2>
-                <div id="inspector" class="text-[10px] text-gray-500 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px]">
+                <div id="inspector" class="text-[11px] leading-relaxed text-gray-400 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px]">
                     Select an element to view literal acoustic properties.
                 </div>
             </section>
@@ -220,9 +233,9 @@
             <canvas id="mapCanvas"></canvas>
             
             <!-- Mouse Telemetry -->
-            <div id="mouseCoords" class="absolute bottom-6 left-6 bg-black/90 backdrop-blur-md px-4 py-2.5 rounded-lg text-[10px] font-black border border-gray-800 pointer-events-none shadow-2xl flex gap-4">
-                <div class="text-gray-500 uppercase tracking-tighter">Position: <span class="text-white" id="xyDisplay">0, 0</span>m</div>
-                <div class="text-gray-500 uppercase tracking-tighter border-l border-gray-800 pl-4">Intensity: <span id="currentDb" class="text-white font-bold">-- dB</span></div>
+            <div id="mouseCoords" class="absolute bottom-6 left-6 bg-black/90 backdrop-blur-md px-4 py-3 rounded-lg text-[11px] font-bold border border-gray-800 pointer-events-none shadow-2xl flex gap-6">
+                <div class="text-gray-500 uppercase tracking-tight">Position: <span class="text-white ml-1 font-mono" id="xyDisplay">0, 0</span>m</div>
+                <div class="text-gray-500 uppercase tracking-tight border-l border-gray-800 pl-6">Intensity: <span id="currentDb" class="text-white ml-1 font-mono">-- dB</span></div>
             </div>
         </div>
     </main>
@@ -236,10 +249,13 @@
         const mapUpload = document.getElementById('mapUpload');
         const scaleSlider = document.getElementById('scaleSlider');
         const scaleInput = document.getElementById('scaleInput');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const brightnessInput = document.getElementById('brightnessInput');
         const downloadBtn = document.getElementById('downloadBtn');
 
         let width, height;
         let scale = 10; 
+        let mapOpacity = 40; 
         let mode = 'source';
         let currentScheme = 'violet';
         let items = [];
@@ -320,6 +336,13 @@
             scale = parseInt(val) || 10;
             if (syncId === 'input') scaleInput.value = val;
             if (syncId === 'slider') scaleSlider.value = val;
+            render();
+        }
+
+        function updateMapBrightness(val, syncId) {
+            mapOpacity = parseInt(val) || 0;
+            if (syncId === 'input') brightnessInput.value = val;
+            if (syncId === 'slider') brightnessSlider.value = val;
             render();
         }
 
@@ -587,7 +610,7 @@
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label>
                             <input type="number" value="${selectedItem.db}" data-prop="db" min="60" max="130"
-                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded"
+                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
                                 oninput="syncInput('db', this.value, 'slider', 60, 130)">
                         </div>
                         <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" 
@@ -598,7 +621,7 @@
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label>
                             <input type="number" value="${selectedItem.beam}" data-prop="beam" min="30" max="360"
-                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded"
+                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
                                 oninput="syncInput('beam', this.value, 'slider', 30, 360)">
                         </div>
                         <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" 
@@ -610,13 +633,13 @@
                     <div class="mb-2">
                         <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Label</label>
                         <input type="text" value="${selectedItem.label}" 
-                            class="w-full bg-black border border-gray-800 rounded p-2 text-white text-[10px] font-bold" 
+                            class="w-full bg-black border border-gray-800 rounded p-2 text-white text-[11px] font-bold" 
                             oninput="selectedItem.label = this.value; render()">
                     </div>
                     <div class="grid grid-cols-3 gap-2">
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
                     </div>
                     <div>
                         <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Material Preset</label>
@@ -630,7 +653,7 @@
                     <div class="flex justify-between items-center mb-1">
                         <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label>
                         <input type="number" value="${selectedItem.angle}" data-prop="angle" min="0" max="359"
-                            class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"
+                            class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded py-0.5"
                             oninput="syncInput('angle', this.value, 'slider', 0, 359)">
                     </div>
                     <input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" 
@@ -649,7 +672,7 @@
                 let dw, dh;
                 if (imgRatio > canvasRatio) { dw = targetWidth; dh = targetWidth / imgRatio; }
                 else { dh = targetHeight; dw = targetHeight * imgRatio; }
-                targetCtx.globalAlpha = 0.4;
+                targetCtx.globalAlpha = mapOpacity / 100;
                 targetCtx.drawImage(backgroundImage, (targetWidth - dw) / 2, (targetHeight - dh) / 2, dw, dh);
                 targetCtx.globalAlpha = 1.0;
             }
@@ -670,41 +693,34 @@
             const scheduleObjects = items.filter(i => i.type !== 'source');
             if (scheduleObjects.length > 0) {
                 const padding = 15 * exportScaleFactor;
-                const itemHeight = 20 * exportScaleFactor;
-                const panelWidth = 220 * exportScaleFactor;
-                const panelHeight = (scheduleObjects.length * itemHeight) + (40 * exportScaleFactor);
+                const itemHeight = 22 * exportScaleFactor;
+                const panelWidth = 260 * exportScaleFactor;
+                const panelHeight = (scheduleObjects.length * itemHeight) + (45 * exportScaleFactor);
                 
                 targetCtx.save();
                 targetCtx.translate(targetWidth - panelWidth - padding, padding);
-                
-                // Panel Background
-                targetCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                targetCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';
                 targetCtx.beginPath();
                 targetCtx.roundRect(0, 0, panelWidth, panelHeight, 8 * exportScaleFactor);
                 targetCtx.fill();
-                targetCtx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
-                targetCtx.lineWidth = 1 * exportScaleFactor;
+                targetCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
+                targetCtx.lineWidth = 1.5 * exportScaleFactor;
                 targetCtx.stroke();
                 
-                // Panel Header
                 targetCtx.fillStyle = 'white';
-                targetCtx.font = `black ${10 * exportScaleFactor}px Inter`;
-                targetCtx.fillText("SITE ELEMENT SCHEDULE (AVG DB)", 10 * exportScaleFactor, 20 * exportScaleFactor);
+                targetCtx.font = `900 ${11 * exportScaleFactor}px Inter`;
+                targetCtx.fillText("SITE ACOUSTIC SCHEDULE (AVG DB)", 12 * exportScaleFactor, 24 * exportScaleFactor);
                 
                 scheduleObjects.forEach((obj, idx) => {
-                    const y = 45 * exportScaleFactor + (idx * itemHeight);
+                    const y = 52 * exportScaleFactor + (idx * itemHeight);
                     const dbVal = calculateTotalDb(obj.x + obj.w/2, obj.y + obj.h/2);
-                    
-                    // Element Label
-                    targetCtx.fillStyle = 'rgba(255,255,255,0.7)';
-                    targetCtx.font = `${9 * exportScaleFactor}px Inter`;
-                    targetCtx.fillText(obj.label, 10 * exportScaleFactor, y);
-                    
-                    // DB Value
-                    targetCtx.fillStyle = 'white';
-                    targetCtx.font = `bold ${9 * exportScaleFactor}px Inter`;
+                    targetCtx.fillStyle = 'rgba(255,255,255,0.85)';
+                    targetCtx.font = `600 ${10 * exportScaleFactor}px Inter`;
+                    targetCtx.fillText(obj.label, 12 * exportScaleFactor, y);
+                    targetCtx.fillStyle = '#8b5cf6';
+                    targetCtx.font = `bold ${11 * exportScaleFactor}px Inter`;
                     targetCtx.textAlign = 'right';
-                    targetCtx.fillText(`${Math.round(dbVal)} dB`, panelWidth - 10 * exportScaleFactor, y);
+                    targetCtx.fillText(`${Math.round(dbVal)} dB`, panelWidth - 12 * exportScaleFactor, y);
                     targetCtx.textAlign = 'start';
                 });
                 targetCtx.restore();
@@ -715,6 +731,7 @@
                 const cy = (item.y + (item.h ? item.h / 2 : 0)) * exportScaleFactor;
                 const w = (item.w || 0) * exportScaleFactor; const h = (item.h || 0) * exportScaleFactor;
                 targetCtx.save(); targetCtx.translate(cx, cy); targetCtx.rotate(item.angle * Math.PI / 180);
+                
                 if (item.type === 'source') {
                     if (item.beam < 360) {
                         targetCtx.beginPath(); targetCtx.moveTo(0, 0);
@@ -730,14 +747,17 @@
                 } else {
                     const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
                     targetCtx.fillStyle = cfg.color + '22'; targetCtx.fillRect(-w/2, -h/2, w, h);
-                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#8b5cf6' : cfg.color; 
-                    targetCtx.lineWidth = 1.5 * exportScaleFactor; targetCtx.strokeRect(-w/2, -h/2, w, h);
-                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${8 * exportScaleFactor}px sans-serif`;
-                    targetCtx.fillText(item.label, -w/2 + 4 * exportScaleFactor, -h/2 + 12 * exportScaleFactor);
+                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#ffffff' : cfg.color; 
+                    targetCtx.lineWidth = 2 * exportScaleFactor; targetCtx.strokeRect(-w/2, -h/2, w, h);
+                    targetCtx.fillStyle = 'white';
+                    targetCtx.font = `700 ${10 * exportScaleFactor}px Inter`;
+                    targetCtx.shadowColor = 'black';
+                    targetCtx.shadowBlur = 4 * exportScaleFactor;
+                    targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 15 * exportScaleFactor);
                     const dbVal = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    // Updated DB Text to White
-                    targetCtx.fillStyle = 'white'; 
-                    targetCtx.fillText(`${Math.round(dbVal)}dB`, -w/2 + 4 * exportScaleFactor, h/2 - 4 * exportScaleFactor);
+                    targetCtx.font = `bold ${10 * exportScaleFactor}px Inter`;
+                    targetCtx.fillText(`${Math.round(dbVal)}dB`, -w/2 + 5 * exportScaleFactor, h/2 - 5 * exportScaleFactor);
+                    targetCtx.shadowBlur = 0;
                 }
                 targetCtx.restore();
             });
@@ -751,7 +771,7 @@
             tempCtx.fillStyle = '#030712'; tempCtx.fillRect(0, 0, exportWidth, exportHeight);
             render(tempCtx, exportWidth, exportHeight, true);
             const link = document.createElement('a');
-            link.download = `site-acoustic-map-${Date.now()}.png`;
+            link.download = `site-acoustic-planner-${Date.now()}.png`;
             link.href = tempCanvas.toDataURL('image/png');
             link.click();
         }
