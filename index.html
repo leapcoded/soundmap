@@ -41,7 +41,7 @@
         .mode-btn {
             background-color: #111827;
             border: 1px solid #1f2937;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .mode-btn:hover {
@@ -71,14 +71,14 @@
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b5cf6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 0.5rem center;
-            background-size: 1rem;
+            background-size: 0.8rem;
         }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-black border-b border-gray-800 p-4 flex justify-between items-center relative overflow-hidden">
+    <header class="bg-black border-b border-gray-800 p-4 flex justify-between items-center relative overflow-hidden shrink-0">
         <div class="absolute inset-0 opacity-5 pointer-events-none theme-gradient"></div>
         <div class="relative z-10">
             <h1 class="text-xl font-black uppercase tracking-tight text-white">
@@ -87,6 +87,13 @@
         </div>
         
         <div class="flex gap-2 items-center relative z-10">
+            <div class="flex bg-gray-900 rounded border border-gray-700 p-0.5 mr-2">
+                <button id="saveBtn" class="text-[9px] font-bold uppercase px-2 py-1 text-gray-400 hover:text-white transition-colors border-r border-gray-700">Save Project</button>
+                <label class="text-[9px] font-bold uppercase px-2 py-1 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                    Load Project
+                    <input type="file" id="projectLoad" class="hidden" accept=".json">
+                </label>
+            </div>
             <label class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded cursor-pointer transition-colors border border-gray-700 text-center">
                 Upload Map
                 <input type="file" id="mapUpload" class="hidden" accept="image/*">
@@ -105,7 +112,7 @@
 
     <main class="flex-1 flex overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-80 bg-black border-r border-gray-800 p-4 flex flex-col gap-6 control-panel overflow-y-auto">
+        <aside class="w-80 bg-black border-r border-gray-800 p-4 flex flex-col gap-6 control-panel overflow-y-auto shrink-0">
             
             <section>
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -113,15 +120,42 @@
                 </h2>
                 <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-800/50 space-y-4">
                     <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">Scale (Pixels/m)</label>
-                            <input type="number" id="scaleInput" min="2" max="50" value="10" 
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Map Calibration (px/m)</label>
+                            <input type="number" id="scaleInput" min="2" max="100" value="10" 
                                 class="w-12 bg-black border border-gray-700 text-blue-400 text-[10px] font-bold text-center rounded py-0.5"
                                 oninput="updateGlobalScale(this.value, 'slider')">
                         </div>
-                        <input type="range" id="scaleSlider" min="2" max="50" value="10" 
+                        <input type="range" id="scaleSlider" min="2" max="100" value="10" 
                             class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
                             oninput="updateGlobalScale(this.value, 'input')">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Wind (km/h)</label>
+                            <input type="number" id="windSpeedInput" min="0" max="100" value="0" 
+                                class="w-full bg-black border border-gray-700 text-violet-400 text-[10px] font-bold text-center rounded py-1"
+                                oninput="updateWind(this.value, 'speed')">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Dir (deg)</label>
+                            <input type="number" id="windDirInput" min="0" max="359" value="0" 
+                                class="w-full bg-black border border-gray-700 text-violet-400 text-[10px] font-bold text-center rounded py-1"
+                                oninput="updateWind(this.value, 'dir')">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Noise Floor (dB)</label>
+                            <input type="number" id="noiseFloorInput" min="20" max="60" value="35" 
+                                class="w-12 bg-black border border-gray-700 text-indigo-400 text-[10px] font-bold text-center rounded py-0.5"
+                                oninput="updateNoiseFloor(this.value, 'slider')">
+                        </div>
+                        <input type="range" id="noiseFloorSlider" min="20" max="60" value="35" 
+                            class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                            oninput="updateNoiseFloor(this.value, 'input')">
                     </div>
 
                     <div>
@@ -135,7 +169,16 @@
                             class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
                             oninput="updateMapBrightness(this.value, 'input')">
                     </div>
-                    
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Ground Surface</label>
+                        <select id="groundType" onchange="updateGround(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-blue-400 text-[10px] font-bold">
+                            <option value="grass">Soft Grass (High Damping)</option>
+                            <option value="compact">Hard Standing (Mid)</option>
+                            <option value="concrete">Concrete / Tarmac (Reflective)</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Intensity Scheme</label>
                         <select id="schemeSelect" onchange="updateScheme(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-violet-400 text-[10px] font-bold">
@@ -155,29 +198,33 @@
                 <div class="grid grid-cols-3 gap-2">
                     <button onclick="setMode('source')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="source">
                         <span class="text-xl">🔊</span>
-                        <span class="text-[9px] font-bold uppercase opacity-70">Speaker</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Speaker</span>
                     </button>
                     <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="barrier">
                         <span class="text-xl">🧱</span>
-                        <span class="text-[9px] font-bold uppercase opacity-70">Barrier</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Barrier</span>
                     </button>
-                    <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="delete">
+                    <button onclick="setMode('ruler')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="ruler">
+                        <span class="text-xl">📏</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Ruler</span>
+                    </button>
+                    <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square col-start-3" data-mode="delete">
                         <span class="text-xl text-blue-400">🗑️</span>
-                        <span class="text-[9px] font-bold uppercase opacity-70">Delete</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Delete</span>
                     </button>
                 </div>
             </section>
 
             <section>
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Elements
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Site Elements
                 </h2>
                 <div class="grid grid-cols-3 gap-2">
                     <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="camping">
                         <span class="text-lg">⛺</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Camping</span>
                     </button>
                     <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="campervans">
-                        <span class="text-lg">🚐</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Caravans</span>
+                        <span class="text-lg">🚐</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Campervans</span>
                     </button>
                     <button onclick="setMode('registration')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="registration">
                         <span class="text-lg">📝</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Registration</span>
@@ -189,7 +236,7 @@
                         <span class="text-lg">🎸</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Stage</span>
                     </button>
                     <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="dancefloor">
-                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Dance</span>
+                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center text-blue-300">Dancefloor</span>
                     </button>
                     <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="bar">
                         <span class="text-lg">🍺</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Bar</span>
@@ -200,8 +247,8 @@
                     <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="kitchen">
                         <span class="text-lg">🍳</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Kitchen</span>
                     </button>
-                    <button onclick="setMode('workshops')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="workshops">
-                        <span class="text-lg">🔨</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Workshops</span>
+                    <button onclick="setMode('workshop')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="workshop">
+                        <span class="text-lg">🔨</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Workshop</span>
                     </button>
                     <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="fire">
                         <span class="text-lg">🔥</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Firepit</span>
@@ -247,15 +294,17 @@
         const xyDisplay = document.getElementById('xyDisplay');
         const currentDbLabel = document.getElementById('currentDb');
         const mapUpload = document.getElementById('mapUpload');
+        const projectLoad = document.getElementById('projectLoad');
         const scaleSlider = document.getElementById('scaleSlider');
         const scaleInput = document.getElementById('scaleInput');
-        const brightnessSlider = document.getElementById('brightnessSlider');
-        const brightnessInput = document.getElementById('brightnessInput');
-        const downloadBtn = document.getElementById('downloadBtn');
-
+        
         let width, height;
         let scale = 10; 
         let mapOpacity = 40; 
+        let noiseFloor = 35;
+        let groundFactor = 1.0; 
+        let windSpeed = 0;
+        let windDir = 0;
         let mode = 'source';
         let currentScheme = 'violet';
         let items = [];
@@ -263,23 +312,28 @@
         let selectedItem = null;
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
+        let rulerStart = null;
+        let rulerEnd = null;
         let backgroundImage = null;
 
         const ATTENUATION_OFF_AXIS = 20;
 
         const MATERIAL_PRESETS = {
-            open: { label: "Air / Open Space", abs: 1 },
-            fabric: { label: "Fabric / Canvas", abs: 70 },
-            padded: { label: "Padded / Soft Goods", abs: 90 },
-            wood: { label: "Wood / Structures", abs: 40 },
-            metal: { label: "Metal / Vehicles", abs: 10 },
-            concrete: { label: "Concrete / Solid", abs: 5 },
-            human: { label: "Crowd / People", abs: 60 }
+            open: { label: "Air / Open Space", abs: 1, type: 'vol' },
+            fabric: { label: "Fabric / Canvas", abs: 70, type: 'shell' },
+            padded: { label: "Padded / Soft Goods", abs: 90, type: 'vol' },
+            wood: { label: "Wood / Structure", abs: 40, type: 'shell' },
+            metal: { label: "Metal / Solid Barrier", abs: 10, type: 'shell' },
+            concrete: { label: "Concrete / Massive", abs: 5, type: 'shell' },
+            heras: { label: "Metal Mesh / Heras", abs: 15, type: 'shell' },
+            plastic: { label: "Plastic / PVC Shell", abs: 50, type: 'shell' },
+            foliage: { label: "Dense Foliage / Hedge", abs: 65, type: 'vol' },
+            human: { label: "Crowd / People", abs: 60, type: 'vol' }
         };
 
         const ZONE_CONFIG = {
             camping: { label: 'Camping', color: '#10b981', material: 'fabric', vH: 2 },
-            campervans: { label: 'Caravans', color: '#fbbf24', material: 'metal', vH: 2.5 },
+            campervans: { label: 'Campervans', color: '#fbbf24', material: 'metal', vH: 2.5 },
             registration: { label: 'Registration / Welcome', color: '#6366f1', material: 'wood', vH: 2.5 },
             welfare: { label: 'Welfare', color: '#f87171', material: 'fabric', vH: 3 },
             stage: { label: 'Stage', color: '#8b5cf6', material: 'wood', vH: 6 },
@@ -287,10 +341,10 @@
             bar: { label: 'Bar', color: '#f59e0b', material: 'wood', vH: 3 },
             chill: { label: 'Chillout', color: '#a855f7', material: 'padded', vH: 3 },
             kitchen: { label: 'Kitchen', color: '#3b82f6', material: 'wood', vH: 3 },
-            workshops: { label: 'Workshops', color: '#2dd4bf', material: 'wood', vH: 3 },
+            workshop: { label: 'Workshop', color: '#2dd4bf', material: 'wood', vH: 3 },
             fire: { label: 'Firepit', color: '#fb7185', material: 'open', vH: 0 },
-            showers: { label: 'Showers', color: '#0ea5e9', material: 'metal', vH: 2.5 },
-            toilets: { label: 'Toilets', color: '#94a3b8', material: 'metal', vH: 2.5 },
+            showers: { label: 'Showers', color: '#0ea5e9', material: 'plastic', vH: 2.5 },
+            toilets: { label: 'Toilets', color: '#94a3b8', material: 'plastic', vH: 2.5 },
             seating: { label: 'Seating', color: '#4ade80', material: 'wood', vH: 0.5 }
         };
 
@@ -319,6 +373,15 @@
             }
         };
 
+        function resize() {
+            const container = canvas.parentElement;
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            render();
+        }
+
         function saveHistory() {
             history.push(JSON.stringify(items));
             if (history.length > 30) history.shift();
@@ -341,8 +404,28 @@
 
         function updateMapBrightness(val, syncId) {
             mapOpacity = parseInt(val) || 0;
-            if (syncId === 'input') brightnessInput.value = val;
-            if (syncId === 'slider') brightnessSlider.value = val;
+            if (syncId === 'input') document.getElementById('brightnessInput').value = val;
+            if (syncId === 'slider') document.getElementById('brightnessSlider').value = val;
+            render();
+        }
+
+        function updateNoiseFloor(val, syncId) {
+            noiseFloor = parseInt(val) || 20;
+            if (syncId === 'input') document.getElementById('noiseFloorInput').value = val;
+            if (syncId === 'slider') document.getElementById('noiseFloorSlider').value = val;
+            render();
+        }
+
+        function updateWind(val, type) {
+            if (type === 'speed') windSpeed = parseFloat(val) || 0;
+            if (type === 'dir') windDir = parseFloat(val) || 0;
+            render();
+        }
+
+        function updateGround(val) {
+            if (val === 'grass') groundFactor = 1.3;
+            else if (val === 'compact') groundFactor = 1.0;
+            else groundFactor = 0.7;
             render();
         }
 
@@ -351,245 +434,218 @@
             render();
         }
 
-        function init() {
-            window.addEventListener('resize', resize);
-            resize();
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
-            document.getElementById('clearBtn').onclick = clearItems;
-            document.getElementById('undoBtn').onclick = undo;
-            downloadBtn.onclick = downloadMap;
-            mapUpload.addEventListener('change', handleMapUpload);
-            setMode('source');
-            render();
-        }
-
-        function handleMapUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => { backgroundImage = img; render(); };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function resize() {
-            const container = canvas.parentElement;
-            width = container.clientWidth;
-            height = container.clientHeight;
-            canvas.width = width;
-            canvas.height = height;
-            render();
-        }
-
-        function setMode(newMode) {
-            mode = newMode;
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.mode === mode);
-            });
-        }
-
-        function clearItems() {
+        function duplicateSelected() {
+            if (!selectedItem) return;
             saveHistory();
-            items = [];
-            selectedItem = null;
-            render();
-        }
-
-        function isPointInItem(px, py, item) {
-            if (item.type === 'source') return Math.hypot(item.x - px, item.y - py) < 15;
-            const cx = item.x + item.w / 2;
-            const cy = item.y + item.h / 2;
-            const angleRad = -item.angle * Math.PI / 180;
-            const dx = px - cx; const dy = py - cy;
-            const localX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
-            const localY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
-            return localX >= -item.w/2 && localX <= item.w/2 && localY >= -item.h/2 && localY <= item.h/2;
-        }
-
-        function handleMouseDown(e) {
-            const pos = getMousePos(e);
-            const hit = [...items].reverse().find(item => isPointInItem(pos.x, pos.y, item));
-
-            if (hit) {
-                if (mode === 'delete') {
-                    saveHistory();
-                    items = items.filter(i => i !== hit);
-                    selectedItem = null;
-                } else {
-                    saveHistory();
-                    selectedItem = hit;
-                    isDragging = true;
-                    dragOffset.x = pos.x - hit.x;
-                    dragOffset.y = pos.y - hit.y;
-                }
-                updateInspector();
-                render();
-                return;
-            }
-
-            if (mode === 'delete') return;
-
-            saveHistory();
-            const newItem = { id: Date.now(), angle: 0 };
-            if (mode === 'source') {
-                newItem.type = 'source';
-                newItem.x = pos.x; newItem.y = pos.y;
-                newItem.db = 100;
-                newItem.beam = 90;
-                newItem.bassBias = 50;
-            } else if (mode === 'barrier') {
-                newItem.type = 'barrier';
-                newItem.x = pos.x - 40; newItem.y = pos.y - 10;
-                newItem.w = 80; newItem.h = 20; newItem.vHeight = 4;
-                newItem.label = "Barrier";
-                newItem.material = 'wood';
-                newItem.absorption = MATERIAL_PRESETS.wood.abs;
-            } else if (ZONE_CONFIG[mode]) {
-                const cfg = ZONE_CONFIG[mode];
-                newItem.type = mode;
-                newItem.x = pos.x - 50; newItem.y = pos.y - 50;
-                newItem.w = 100; newItem.h = 100;
-                newItem.vHeight = cfg.vH;
-                newItem.label = cfg.label;
-                newItem.material = cfg.material;
-                newItem.absorption = MATERIAL_PRESETS[cfg.material].abs;
-            } else { return; }
-
+            const newItem = JSON.parse(JSON.stringify(selectedItem));
+            newItem.id = Date.now();
+            newItem.x += 20; newItem.y += 20;
             items.push(newItem);
             selectedItem = newItem;
             updateInspector();
             render();
         }
 
+        function saveProject() {
+            const data = { items, scale, mapOpacity, noiseFloor, groundFactor, windSpeed, windDir, currentScheme };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url;
+            a.download = `acoustic-planner-export-${Date.now()}.json`; a.click();
+        }
+
+        function loadProject(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const d = JSON.parse(event.target.result);
+                    items = d.items || []; scale = d.scale || 10; mapOpacity = d.mapOpacity || 40;
+                    noiseFloor = d.noiseFloor || 35; groundFactor = d.groundFactor || 1.0;
+                    windSpeed = d.windSpeed || 0; windDir = d.windDir || 0;
+                    currentScheme = d.currentScheme || 'violet';
+                    selectedItem = null; updateInspector(); render();
+                } catch (err) { console.error("Load failed"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function init() {
+            window.addEventListener('resize', resize); resize();
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            document.getElementById('clearBtn').onclick = () => { saveHistory(); items = []; selectedItem = null; render(); };
+            document.getElementById('undoBtn').onclick = undo;
+            document.getElementById('downloadBtn').onclick = downloadMap;
+            document.getElementById('saveBtn').onclick = saveProject;
+            document.getElementById('projectLoad').addEventListener('change', loadProject);
+            document.getElementById('mapUpload').addEventListener('change', handleMapUpload);
+            setMode('source'); render();
+        }
+
+        function handleMapUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (ev) => { const img = new Image(); img.onload = () => { backgroundImage = img; render(); }; img.src = ev.target.result; };
+            r.readAsDataURL(file);
+        }
+
+        function isPointInItem(px, py, item) {
+            if (item.type === 'source') return Math.hypot(item.x - px, item.y - py) < 15;
+            const cx = item.x + item.w / 2; const cy = item.y + item.h / 2;
+            const r = -item.angle * Math.PI / 180;
+            const dx = px - cx, dy = py - cy;
+            const lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
+            return lx >= -item.w/2 && lx <= item.w/2 && ly >= -item.h/2 && ly <= item.h/2;
+        }
+
+        function handleMouseDown(e) {
+            const pos = getMousePos(e);
+            if (mode === 'ruler') { rulerStart = pos; rulerEnd = pos; render(); return; }
+            const hit = [...items].reverse().find(item => isPointInItem(pos.x, pos.y, item));
+            if (hit) {
+                if (mode === 'delete') { saveHistory(); items = items.filter(i => i !== hit); selectedItem = null; }
+                else { saveHistory(); selectedItem = hit; isDragging = true; dragOffset.x = pos.x - hit.x; dragOffset.y = pos.y - hit.y; }
+                updateInspector(); render(); return;
+            }
+            if (mode === 'delete' || mode === 'ruler') return;
+            saveHistory();
+            const newItem = { id: Date.now(), angle: 0 };
+            if (mode === 'source') { newItem.type = 'source'; newItem.x = pos.x; newItem.y = pos.y; newItem.db = 100; newItem.beam = 90; newItem.bassBias = 50; newItem.vHeight = 4; }
+            else if (mode === 'barrier') { newItem.type = 'barrier'; newItem.x = pos.x - 40; newItem.y = pos.y - 10; newItem.w = 80; newItem.h = 20; newItem.vHeight = 4; newItem.label = "Barrier"; newItem.material = 'wood'; newItem.absorption = 40; }
+            else if (ZONE_CONFIG[mode]) { const cfg = ZONE_CONFIG[mode]; newItem.type = mode; newItem.x = pos.x - 50; newItem.y = pos.y - 50; newItem.w = 100; newItem.h = 100; newItem.vHeight = cfg.vH; newItem.label = cfg.label; newItem.material = cfg.material; newItem.absorption = MATERIAL_PRESETS[cfg.material].abs; }
+            else { return; }
+            items.push(newItem); selectedItem = newItem; updateInspector(); render();
+        }
+
         function handleMouseMove(e) {
             const pos = getMousePos(e);
             xyDisplay.textContent = `${Math.round(pos.x/scale)}, ${Math.round(pos.y/scale)}`;
-            const dbAtMouse = calculateTotalDb(pos.x, pos.y);
-            currentDbLabel.textContent = `${Math.round(dbAtMouse)} dB`;
-            if (isDragging && selectedItem) {
-                selectedItem.x = pos.x - dragOffset.x;
-                selectedItem.y = pos.y - dragOffset.y;
-                render();
-            }
+            if (mode === 'ruler' && rulerStart) { rulerEnd = pos; render(); return; }
+            const db = calculateTotalDb(pos.x, pos.y);
+            currentDbLabel.textContent = `${Math.round(db)} dB`;
+            if (isDragging && selectedItem) { selectedItem.x = pos.x - dragOffset.x; selectedItem.y = pos.y - dragOffset.y; render(); }
         }
 
-        function handleMouseUp() { isDragging = false; }
+        function handleMouseUp() { isDragging = false; rulerStart = null; rulerEnd = null; render(); }
 
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        }
+        function getMousePos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 
         function calculateTotalDb(x, y) {
-            let totalIntensity = 0;
+            let total = 0;
             const sources = items.filter(i => i.type === 'source');
-            const objects = items.filter(i => i.type !== 'source');
-            sources.forEach(source => {
-                totalIntensity += calculateIntensity(source, x, y, objects);
-                objects.forEach(obj => {
-                    if (obj.material !== 'open') {
-                        const imageSource = getMirroredPoint(source.x, source.y, obj);
-                        const distPixels = Math.hypot(imageSource.x - x, imageSource.y - y);
-                        const distMeters = Math.max(0.1, distPixels / scale);
-                        const reflectionEfficiency = 1 - (source.bassBias / 150); 
-                        const baseReflectionLoss = -10 * Math.log10(1 - (Math.min(99, obj.absorption) / 100));
-                        let reflectedDb = source.db - (20 * Math.log10(distMeters)) - (baseReflectionLoss / reflectionEfficiency);
-                        if (isReflectionValid(source, {x, y}, obj)) { totalIntensity += Math.pow(10, reflectedDb / 10); }
+            const objs = items.filter(i => i.type !== 'source');
+            sources.forEach(s => {
+                let intensity = calculateIntensity(s, x, y, objs);
+                total += intensity;
+                objs.forEach(o => {
+                    if (o.material !== 'open') {
+                        const imgS = getMirroredPoint(s.x, s.y, o);
+                        const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / scale);
+                        const loss = -10 * Math.log10(1 - (Math.min(99, o.absorption) / 100));
+                        let db = s.db - (20 * distM) - loss;
+                        if (isReflectionValid(s, {x, y}, o)) total += Math.pow(10, db / 10);
                     }
                 });
             });
-            return totalIntensity > 0 ? 10 * Math.log10(totalIntensity) : 0;
+            return Math.max(noiseFloor, total > 0 ? 10 * Math.log10(total) : 0);
         }
 
-        function calculateIntensity(source, tx, ty, objects) {
-            const distPixels = Math.hypot(source.x - tx, source.y - ty);
-            const distMeters = Math.max(0.1, distPixels / scale); 
-            let currentDb = source.db - (20 * Math.log10(distMeters));
-            if (source.beam < 360) {
-                const angleToPoint = Math.atan2(ty - source.y, tx - source.x) * (180 / Math.PI);
-                let diff = Math.abs(angleToPoint - source.angle) % 360;
-                if (diff > 180) diff = 360 - diff;
-                if (diff > source.beam / 2) currentDb -= ATTENUATION_OFF_AXIS;
+        function calculateIntensity(s, tx, ty, objs) {
+            const distM = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
+            let db = s.db - (20 * groundFactor * Math.log10(distM));
+            
+            if (windSpeed > 0) {
+                const angleToPoint = Math.atan2(ty - s.y, tx - s.x);
+                const windRad = windDir * (Math.PI / 180);
+                const cosDiff = Math.cos(angleToPoint - windRad);
+                db += (windSpeed / 20) * cosDiff * (distM / 50);
             }
-            objects.forEach(obj => {
-                const intersectLength = getIntersectionLength(source.x, source.y, tx, ty, obj);
-                if (intersectLength > 0) {
-                    const bassPassThrough = 1 - (source.bassBias / 120); 
-                    if (obj.vHeight > 0.5) { currentDb -= Math.min(20, obj.vHeight * 4) * bassPassThrough; }
-                    else { currentDb -= ((intersectLength / scale) * (obj.absorption / 10)) * bassPassThrough; }
+
+            if (s.beam < 360) {
+                const aP = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI);
+                let diff = Math.abs(aP - s.angle) % 360; if (diff > 180) diff = 360 - diff;
+                if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS;
+            }
+            objs.forEach(o => {
+                if (isPointInItem(s.x, s.y, o) && isPointInItem(tx, ty, o) && MATERIAL_PRESETS[o.material].type === 'shell') return;
+                const iL = getIntersectionLength(s.x, s.y, tx, ty, o);
+                if (iL > 0) {
+                    const bass = 1 - (s.bassBias / 120);
+                    const diffraction = s.vHeight > o.vHeight ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3) : 1.0;
+                    if (o.vHeight > 0.5) db -= (Math.min(20, o.vHeight * 4) * bass * diffraction);
+                    else db -= ((iL / scale) * (o.absorption / 10)) * bass;
                 }
             });
-            return Math.pow(10, currentDb / 10);
+            return Math.pow(10, db / 10);
         }
 
-        function getIntersectionLength(x1, y1, x2, y2, rect) {
-            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
-            const rad = -rect.angle * Math.PI / 180;
-            const rotate = (px, py) => {
-                const dx = px - cx; const dy = py - cy;
-                return { x: dx * Math.cos(rad) - dy * Math.sin(rad), y: dx * Math.sin(rad) + dy * Math.cos(rad) };
-            };
-            const p1 = rotate(x1, y1); const p2 = rotate(x2, y2);
-            const minX = -rect.w/2, maxX = rect.w/2, minY = -rect.h/2, maxY = rect.h/2;
-            let tMin = 0, tMax = 1;
-            const dx = p2.x - p1.x, dy = p2.y - p1.y;
-            const clip = (p, q) => {
-                if (p === 0) return q >= 0;
-                const t = q / p;
-                if (p < 0) { if (t > tMax) return false; if (t > tMin) tMin = t; }
-                else { if (t < tMin) return false; if (t < tMax) tMax = t; }
-                return true;
-            };
-            if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) && clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) {
-                if (tMax > tMin) return Math.hypot((tMax - tMin) * dx, (tMax - tMin) * dy);
-            }
+        function getIntersectionLength(x1, y1, x2, y2, r) {
+            const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rad = -r.angle * Math.PI / 180;
+            const rot = (px, py) => { const dx = px - cx, dy = py - cy; return { x: dx * Math.cos(rad) - dy * Math.sin(rad), y: dx * Math.sin(rad) + dy * Math.cos(rad) }; };
+            const p1 = rot(x1, y1), p2 = rot(x2, y2);
+            const minX = -r.w/2, maxX = r.w/2, minY = -r.h/2, maxY = r.h/2;
+            let tMin = 0, tMax = 1, dx = p2.x - p1.x, dy = p2.y - p1.y;
+            const clip = (p, q) => { if (p === 0) return q >= 0; const t = q / p; if (p < 0) { if (t > tMax) return false; if (t > tMin) tMin = t; } else { if (t < tMin) return false; if (t < tMax) tMax = t; } return true; };
+            if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) && clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) { if (tMax > tMin) return Math.hypot((tMax - tMin) * dx, (tMax - tMin) * dy); }
             return 0;
         }
 
-        function getMirroredPoint(px, py, rect) {
-            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
-            const rad = rect.angle * Math.PI / 180;
-            const dx = px - cx; const dy = py - cy;
-            const lx = dx * Math.cos(-rad) - dy * Math.sin(-rad);
-            const ly = dx * Math.sin(-rad) + dy * Math.cos(-rad);
-            const mLy = -ly;
-            const rx = lx * Math.cos(rad) - mLy * Math.sin(rad);
-            const ry = lx * Math.sin(rad) + mLy * Math.cos(rad);
+        function getMirroredPoint(px, py, r) {
+            const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rad = r.angle * Math.PI / 180;
+            const dx = px - cx, dy = py - cy, lx = dx * Math.cos(-rad) - dy * Math.sin(-rad), ly = dx * Math.sin(-rad) + dy * Math.cos(-rad);
+            const mLy = -ly, rx = lx * Math.cos(rad) - mLy * Math.sin(rad), ry = lx * Math.sin(rad) + mLy * Math.cos(rad);
             return { x: rx + cx, y: ry + cy };
         }
 
-        function isReflectionValid(source, target, rect) {
-            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
-            const rad = rect.angle * Math.PI / 180;
-            const toLocal = (p) => {
-                const dx = p.x - cx; const dy = p.y - cy;
-                return { x: dx * Math.cos(-rad) - dy * Math.sin(-rad), y: dx * Math.sin(-rad) + dy * Math.cos(-rad) };
-            };
-            const lS = toLocal(source); const lT = toLocal(target);
-            if ((lS.y > 0 && lT.y > 0) || (lS.y < 0 && lT.y < 0)) {
-                const t = Math.abs(lS.y) / (Math.abs(lS.y) + Math.abs(lT.y));
-                const hitX = lS.x + t * (lT.x - lS.x);
-                return hitX >= -rect.w/2 && hitX <= rect.w/2;
-            }
+        function isReflectionValid(s, t, r) {
+            const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rad = r.angle * Math.PI / 180;
+            const loc = (p) => { const dx = p.x - cx, dy = p.y - cy; return { x: dx * Math.cos(-rad) - dy * Math.sin(-rad), y: dx * Math.sin(-rad) + dy * Math.cos(-rad) }; };
+            const lS = loc(s), lT = loc(t);
+            if ((lS.y > 0 && lT.y > 0) || (lS.y < 0 && lT.y < 0)) { const ti = Math.abs(lS.y) / (Math.abs(lS.y) + Math.abs(lT.y)), hX = lS.x + ti * (lT.x - lS.x); return hX >= -r.w/2 && hX <= r.w/2; }
             return false;
         }
 
-        function syncInput(property, value, type, min, max) {
-            let val = parseFloat(value);
-            if (isNaN(val)) return;
-            val = Math.max(min, Math.min(max, val));
-            selectedItem[property] = val;
-            const container = document.getElementById('inspector');
-            const slider = container.querySelector(`input[type=range][data-prop="${property}"]`);
-            const number = container.querySelector(`input[type=number][data-prop="${property}"]`);
-            if (type === 'slider' && slider) slider.value = val;
-            if (type === 'number' && number) number.value = val;
-            render();
+        function updateInspector() {
+            if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-700">Select an element to edit details.</p>`; return; }
+            const isS = selectedItem.type === 'source';
+            let h = `<div class="space-y-3">`;
+            if (isS) {
+                h += `
+                    <div class="bg-black p-2 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase">SPL (Peak dB)</label><input type="number" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('db', this.value, 'number', 60, 130)">
+                    </div>
+                    <div class="bg-black p-2 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase">Dispersion (°)</label><input type="number" value="${selectedItem.beam}" oninput="syncInput('beam', this.value, 'slider', 30, 360)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('beam', this.value, 'number', 30, 360)">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Mount Hgt (m)</label><input type="number" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Bass Bias (%)</label><input type="number" value="${selectedItem.bassBias}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.bassBias = parseFloat(this.value); render()"></div>
+                    </div>`;
+            } else {
+                h += `
+                    <div class="mb-1"><label class="block text-[9px] font-black text-gray-500 uppercase mb-1">Element Label</label><input type="text" value="${selectedItem.label}" class="w-full bg-black border border-gray-800 rounded p-1.5 text-white text-[10px] font-bold" oninput="selectedItem.label = this.value; render()"></div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">W (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">L (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">H (m)</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
+                    </div>
+                    <div><label class="block text-[9px] font-black text-gray-500 uppercase mb-1">Material Preset</label><select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}</select></div>`;
+            }
+            h += `<div class="bg-black p-2 rounded border border-gray-800"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label><input type="number" value="${selectedItem.angle}" oninput="syncInput('angle', this.value, 'slider', 0, 359)" class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"></div><input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('angle', this.value, 'number', 0, 359)"></div><button onclick="duplicateSelected()" class="w-full theme-gradient text-white text-[10px] font-bold uppercase py-1.5 rounded hover:brightness-110 mt-2">Duplicate Element</button></div>`;
+            inspector.innerHTML = h;
+        }
+
+        function syncInput(p, v, t, mi, ma) {
+            let val = parseFloat(v); if (isNaN(val)) return; val = Math.max(mi, Math.min(ma, val)); selectedItem[p] = val;
+            const c = document.getElementById('inspector');
+            const s = c.querySelector(`input[type=range][data-prop="${p}"]`), n = c.querySelector(`input[type=number][data-prop="${p}"]`);
+            if (t === 'slider' && s) s.value = val; if (t === 'number' && n) n.value = val; render();
         }
 
         function updateMaterial(matKey) {
@@ -599,183 +655,83 @@
             render();
         }
 
-        function updateInspector() {
-            if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-700">Select an element to edit details.</p>`; return; }
-            const isSource = selectedItem.type === 'source';
-            let html = `<div class="space-y-4">`;
-            
-            if (isSource) {
-                html += `
-                    <div class="bg-black p-3 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label>
-                            <input type="number" value="${selectedItem.db}" data-prop="db" min="60" max="130"
-                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
-                                oninput="syncInput('db', this.value, 'slider', 60, 130)">
-                        </div>
-                        <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" 
-                            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
-                            oninput="syncInput('db', this.value, 'number', 60, 130)">
-                    </div>
-                    <div class="bg-black p-3 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label>
-                            <input type="number" value="${selectedItem.beam}" data-prop="beam" min="30" max="360"
-                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
-                                oninput="syncInput('beam', this.value, 'slider', 30, 360)">
-                        </div>
-                        <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" 
-                            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
-                            oninput="syncInput('beam', this.value, 'number', 30, 360)">
-                    </div>`;
-            } else {
-                html += `
-                    <div class="mb-2">
-                        <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Label</label>
-                        <input type="text" value="${selectedItem.label}" 
-                            class="w-full bg-black border border-gray-800 rounded p-2 text-white text-[11px] font-bold" 
-                            oninput="selectedItem.label = this.value; render()">
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[11px] font-mono" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
-                    </div>
-                    <div>
-                        <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Material Preset</label>
-                        <select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">
-                            ${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}
-                        </select>
-                    </div>`;
-            }
-            html += `
-                <div class="bg-black p-3 rounded border border-gray-800">
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label>
-                        <input type="number" value="${selectedItem.angle}" data-prop="angle" min="0" max="359"
-                            class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded py-0.5"
-                            oninput="syncInput('angle', this.value, 'slider', 0, 359)">
-                    </div>
-                    <input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" 
-                        class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
-                        oninput="syncInput('angle', this.value, 'number', 0, 359)">
-                </div>
-            </div>`;
-            inspector.innerHTML = html;
-        }
-
-        function render(targetCtx = ctx, targetWidth = width, targetHeight = height, isExport = false) {
-            targetCtx.clearRect(0, 0, targetWidth, targetHeight);
+        function render(tCtx = ctx, tW = width, tH = height, isEx = false) {
+            tCtx.clearRect(0, 0, tW, tH);
             if (backgroundImage) {
-                const imgRatio = backgroundImage.width / backgroundImage.height;
-                const canvasRatio = targetWidth / targetHeight;
-                let dw, dh;
-                if (imgRatio > canvasRatio) { dw = targetWidth; dh = targetWidth / imgRatio; }
-                else { dh = targetHeight; dw = targetHeight * imgRatio; }
-                targetCtx.globalAlpha = mapOpacity / 100;
-                targetCtx.drawImage(backgroundImage, (targetWidth - dw) / 2, (targetHeight - dh) / 2, dw, dh);
-                targetCtx.globalAlpha = 1.0;
+                tCtx.globalAlpha = mapOpacity / 100;
+                const r = backgroundImage.width / backgroundImage.height; let dw = tW, dh = tW / r; if (r < tW / tH) { dh = tH; dw = tH * r; }
+                tCtx.drawImage(backgroundImage, (tW - dw) / 2, (tH - dh) / 2, dw, dh); tCtx.globalAlpha = 1.0;
             }
-            const step = isExport ? 4 : 8; 
-            const exportScaleFactor = targetWidth / width;
-            for (let x = 0; x < targetWidth; x += step) {
-                for (let y = 0; y < targetHeight; y += step) {
-                    const db = calculateTotalDb(x / exportScaleFactor, y / exportScaleFactor);
-                    if (db > 40) {
-                        const alpha = Math.min(0.3, (db - 40) / 100);
-                        const color = INTENSITY_SCHEMES[currentScheme](db, alpha);
-                        targetCtx.fillStyle = color; targetCtx.fillRect(x, y, step, step);
+            const s = isEx ? 4 : 8, ex = tW / width;
+            for (let x = 0; x < tW; x += s) {
+                for (let y = 0; y < tH; y += s) {
+                    const db = calculateTotalDb(x / ex, y / ex);
+                    if (db > noiseFloor + 1) {
+                        const col = INTENSITY_SCHEMES[currentScheme](db, Math.min(0.3, (db - 35) / 100));
+                        tCtx.fillStyle = col; tCtx.fillRect(x, y, s, s);
                     }
                 }
             }
-
-            // Draw Element Key Schedule
-            const scheduleObjects = items.filter(i => i.type !== 'source');
-            if (scheduleObjects.length > 0) {
-                const padding = 15 * exportScaleFactor;
-                const itemHeight = 22 * exportScaleFactor;
-                const panelWidth = 260 * exportScaleFactor;
-                const panelHeight = (scheduleObjects.length * itemHeight) + (45 * exportScaleFactor);
-                
-                targetCtx.save();
-                targetCtx.translate(targetWidth - panelWidth - padding, padding);
-                targetCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-                targetCtx.beginPath();
-                targetCtx.roundRect(0, 0, panelWidth, panelHeight, 8 * exportScaleFactor);
-                targetCtx.fill();
-                targetCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
-                targetCtx.lineWidth = 1.5 * exportScaleFactor;
-                targetCtx.stroke();
-                
-                targetCtx.fillStyle = 'white';
-                targetCtx.font = `900 ${11 * exportScaleFactor}px Inter`;
-                targetCtx.fillText("SITE ACOUSTIC SCHEDULE (AVG DB)", 12 * exportScaleFactor, 24 * exportScaleFactor);
-                
-                scheduleObjects.forEach((obj, idx) => {
-                    const y = 52 * exportScaleFactor + (idx * itemHeight);
-                    const dbVal = calculateTotalDb(obj.x + obj.w/2, obj.y + obj.h/2);
-                    targetCtx.fillStyle = 'rgba(255,255,255,0.85)';
-                    targetCtx.font = `600 ${10 * exportScaleFactor}px Inter`;
-                    targetCtx.fillText(obj.label, 12 * exportScaleFactor, y);
-                    targetCtx.fillStyle = '#8b5cf6';
-                    targetCtx.font = `bold ${11 * exportScaleFactor}px Inter`;
-                    targetCtx.textAlign = 'right';
-                    targetCtx.fillText(`${Math.round(dbVal)} dB`, panelWidth - 12 * exportScaleFactor, y);
-                    targetCtx.textAlign = 'start';
-                });
-                targetCtx.restore();
+            // Schedule Render
+            const sch = items.filter(i => i.type !== 'source');
+            if (sch.length > 0) {
+                const pad = 15 * ex, iH = 22 * ex, pW = 320 * ex, pH = (sch.length * iH) + (55 * ex);
+                tCtx.save(); tCtx.translate(tW - pW - pad, pad); tCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                tCtx.beginPath(); tCtx.roundRect(0, 0, pW, pH, 10 * ex); tCtx.fill();
+                tCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)'; tCtx.lineWidth = 2 * ex; tCtx.stroke();
+                tCtx.fillStyle = 'white'; tCtx.font = `900 ${11 * ex} Inter`; tCtx.fillText("SITE ACOUSTIC SCHEDULE", 15 * ex, 25 * ex);
+                sch.forEach((o, i) => {
+                    const y = 55 * ex + (i * iH); const dbV = calculateTotalDb(o.x + o.w/2, o.y + o.h/2);
+                    tCtx.fillStyle = 'rgba(255,255,255,0.6)'; tCtx.font = `${9 * ex}px Inter`; tCtx.fillText(o.material.toUpperCase(), 15 * ex, y);
+                    tCtx.fillStyle = 'white'; tCtx.font = `700 ${10 * ex}px Inter`; tCtx.fillText(o.label, 100 * ex, y);
+                    tCtx.fillStyle = '#8b5cf6'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText(`${Math.round(dbV)} dB`, pW - 15 * ex, y); tCtx.textAlign = 'start';
+                }); tCtx.restore();
+            }
+            // Calibration bar
+            const bP = 20 * ex, bW = 10 * scale * ex, bH = 6 * ex;
+            tCtx.fillStyle = 'white'; tCtx.fillRect(tW - bW - bP, tH - bP - bH, bW, bH);
+            tCtx.font = `bold ${10 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText("10m CALIBRATION BAR", tW - bP, tH - bP - bH - 5); tCtx.textAlign = 'start';
+            
+            if (rulerStart && rulerEnd) {
+                tCtx.beginPath(); tCtx.moveTo(rulerStart.x * ex, rulerStart.y * ex); tCtx.lineTo(rulerEnd.x * ex, rulerEnd.y * ex);
+                tCtx.strokeStyle = '#3b82f6'; tCtx.lineWidth = 2; tCtx.setLineDash([5, 5]); tCtx.stroke(); tCtx.setLineDash([]);
+                const d = Math.hypot(rulerEnd.x - rulerStart.x, rulerEnd.y - rulerStart.y) / scale;
+                tCtx.fillStyle = 'white'; tCtx.font = 'bold 12px Inter'; tCtx.fillText(`${d.toFixed(1)}m`, rulerEnd.x * ex + 10, rulerEnd.y * ex);
             }
 
             items.forEach(item => {
-                const cx = (item.x + (item.w ? item.w / 2 : 0)) * exportScaleFactor;
-                const cy = (item.y + (item.h ? item.h / 2 : 0)) * exportScaleFactor;
-                const w = (item.w || 0) * exportScaleFactor; const h = (item.h || 0) * exportScaleFactor;
-                targetCtx.save(); targetCtx.translate(cx, cy); targetCtx.rotate(item.angle * Math.PI / 180);
-                
+                const cx = (item.x + (item.w ? item.w / 2 : 0)) * ex, cy = (item.y + (item.h ? item.h / 2 : 0)) * ex, w = (item.w || 0) * ex, h = (item.h || 0) * ex;
+                tCtx.save(); tCtx.translate(cx, cy); tCtx.rotate(item.angle * Math.PI / 180);
                 if (item.type === 'source') {
                     if (item.beam < 360) {
-                        targetCtx.beginPath(); targetCtx.moveTo(0, 0);
-                        const start = (-item.beam / 2) * (Math.PI / 180); const end = (item.beam / 2) * (Math.PI / 180);
-                        targetCtx.arc(0, 0, 40 * exportScaleFactor, start, end); targetCtx.lineTo(0, 0);
-                        targetCtx.fillStyle = 'rgba(139, 92, 246, 0.15)'; targetCtx.fill();
-                        targetCtx.strokeStyle = 'rgba(139, 92, 246, 0.4)'; targetCtx.lineWidth = 1; targetCtx.stroke();
+                        tCtx.beginPath(); tCtx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180);
+                        tCtx.arc(0, 0, 40 * ex, sA, eA); tCtx.lineTo(0, 0); tCtx.fillStyle = 'rgba(139, 92, 246, 0.2)'; tCtx.fill();
                     }
-                    targetCtx.beginPath(); targetCtx.arc(0, 0, 8 * exportScaleFactor, 0, Math.PI * 2);
-                    targetCtx.fillStyle = '#8b5cf6'; targetCtx.fill();
-                    targetCtx.beginPath(); targetCtx.moveTo(6 * exportScaleFactor, 0); targetCtx.lineTo(12 * exportScaleFactor, 0); targetCtx.lineWidth = 3 * exportScaleFactor; targetCtx.strokeStyle = 'white'; targetCtx.stroke();
-                    if (!isExport && selectedItem === item) { targetCtx.strokeStyle = 'white'; targetCtx.lineWidth = 2; targetCtx.stroke(); }
+                    tCtx.beginPath(); tCtx.arc(0, 0, 8 * ex, 0, Math.PI * 2); tCtx.fillStyle = '#8b5cf6'; tCtx.fill();
+                    tCtx.beginPath(); tCtx.moveTo(6 * ex, 0); tCtx.lineTo(12 * ex, 0); tCtx.lineWidth = 3 * ex; tCtx.strokeStyle = 'white'; tCtx.stroke();
+                    if (!isEx && selectedItem === item) { tCtx.strokeStyle = 'white'; tCtx.lineWidth = 2; tCtx.stroke(); }
                 } else {
                     const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
-                    targetCtx.fillStyle = cfg.color + '22'; targetCtx.fillRect(-w/2, -h/2, w, h);
-                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#ffffff' : cfg.color; 
-                    targetCtx.lineWidth = 2 * exportScaleFactor; targetCtx.strokeRect(-w/2, -h/2, w, h);
-                    targetCtx.fillStyle = 'white';
-                    targetCtx.font = `700 ${10 * exportScaleFactor}px Inter`;
-                    targetCtx.shadowColor = 'black';
-                    targetCtx.shadowBlur = 4 * exportScaleFactor;
-                    targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 15 * exportScaleFactor);
-                    const dbVal = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    targetCtx.font = `bold ${10 * exportScaleFactor}px Inter`;
-                    targetCtx.fillText(`${Math.round(dbVal)}dB`, -w/2 + 5 * exportScaleFactor, h/2 - 5 * exportScaleFactor);
-                    targetCtx.shadowBlur = 0;
+                    tCtx.fillStyle = cfg.color + '22'; tCtx.fillRect(-w/2, -h/2, w, h);
+                    tCtx.strokeStyle = (!isEx && selectedItem === item) ? '#ffffff' : cfg.color; 
+                    tCtx.lineWidth = 2 * ex; tCtx.strokeRect(-w/2, -h/2, w, h);
+                    tCtx.fillStyle = 'white'; tCtx.font = `900 ${10 * ex}px Inter`; tCtx.shadowColor = 'black'; tCtx.shadowBlur = 4 * ex;
+                    tCtx.fillText(item.label, -w/2 + 5 * ex, -h/2 + 15 * ex);
+                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
+                    tCtx.font = `bold ${10 * ex}px Inter`; tCtx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5 * ex, h/2 - 5 * ex); tCtx.shadowBlur = 0;
                 }
-                targetCtx.restore();
+                tCtx.restore();
             });
         }
 
         function downloadMap() {
-            const exportWidth = 3000; const aspectRatio = height / width; const exportHeight = exportWidth * aspectRatio;
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = exportWidth; tempCanvas.height = exportHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#030712'; tempCtx.fillRect(0, 0, exportWidth, exportHeight);
-            render(tempCtx, exportWidth, exportHeight, true);
-            const link = document.createElement('a');
-            link.download = `site-acoustic-planner-${Date.now()}.png`;
-            link.href = tempCanvas.toDataURL('image/png');
-            link.click();
+            const eW = 3000, eH = eW * (height / width), tC = document.createElement('canvas'); tC.width = eW; tC.height = eH;
+            const tCtx = tC.getContext('2d'); tCtx.fillStyle = '#030712'; tCtx.fillRect(0, 0, eW, eH);
+            render(tCtx, eW, eH, true);
+            const l = document.createElement('a'); l.download = `acoustic-master-plan-${Date.now()}.png`; l.href = tC.toDataURL('image/png'); l.click();
         }
 
+        function setMode(m) { mode = m; document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode)); }
         window.onload = init;
     </script>
 </body>
