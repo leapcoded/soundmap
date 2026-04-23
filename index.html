@@ -24,8 +24,8 @@
         canvas {
             cursor: crosshair;
             background-image: 
-                linear-gradient(to right, rgba(139, 92, 246, 0.05) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+                linear-gradient(to right, rgba(139, 92, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
@@ -52,7 +52,7 @@
         .mode-btn.active {
             background-color: rgba(139, 92, 246, 0.15);
             border-color: var(--accent-violet);
-            box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
         }
 
         input[type=number]::-webkit-inner-spin-button, 
@@ -77,7 +77,6 @@
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Header -->
     <header class="bg-black border-b border-gray-800 p-4 flex justify-between items-center relative overflow-hidden shrink-0">
         <div class="absolute inset-0 opacity-5 pointer-events-none theme-gradient"></div>
         <div class="relative z-10">
@@ -87,15 +86,15 @@
         </div>
         
         <div class="flex gap-2 items-center relative z-10">
-            <div class="flex bg-gray-900 rounded border border-gray-700 p-0.5 mr-2">
-                <button id="saveBtn" class="text-[9px] font-bold uppercase px-2 py-1 text-gray-400 hover:text-white transition-colors border-r border-gray-700">Save Project</button>
+            <div class="flex bg-gray-900 rounded border border-gray-700 p-0.5 mr-2 shadow-inner">
+                <button id="saveBtn" class="text-[9px] font-bold uppercase px-2 py-1 text-gray-400 hover:text-white transition-colors border-r border-gray-700">Save</button>
                 <label class="text-[9px] font-bold uppercase px-2 py-1 text-gray-400 hover:text-white transition-colors cursor-pointer">
-                    Load Project
+                    Load
                     <input type="file" id="projectLoad" class="hidden" accept=".json">
                 </label>
             </div>
             <label class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded cursor-pointer transition-colors border border-gray-700 text-center">
-                Upload Map
+                Map Upload
                 <input type="file" id="mapUpload" class="hidden" accept="image/*">
             </label>
             <button id="downloadBtn" class="theme-gradient text-white text-[10px] font-black uppercase px-3 py-1.5 rounded shadow-lg hover:brightness-110 transition-all">
@@ -111,14 +110,13 @@
     </header>
 
     <main class="flex-1 flex overflow-hidden">
-        <!-- Sidebar -->
         <aside class="w-80 bg-black border-r border-gray-800 p-4 flex flex-col gap-6 control-panel overflow-y-auto shrink-0">
             
             <section>
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Global Settings
                 </h2>
-                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-800/50 space-y-4">
+                <div class="bg-gray-900/40 p-3 rounded-lg border border-gray-800 space-y-4 shadow-xl">
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-[10px] font-bold text-gray-400 uppercase">Map Calibration (px/m)</label>
@@ -127,7 +125,7 @@
                                 oninput="updateGlobalScale(this.value, 'slider')">
                         </div>
                         <input type="range" id="scaleSlider" min="2" max="100" value="10" 
-                            class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                            class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent"
                             oninput="updateGlobalScale(this.value, 'input')">
                     </div>
 
@@ -154,28 +152,38 @@
                                 oninput="updateNoiseFloor(this.value, 'slider')">
                         </div>
                         <input type="range" id="noiseFloorSlider" min="20" max="60" value="35" 
-                            class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                            class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent"
                             oninput="updateNoiseFloor(this.value, 'input')">
                     </div>
 
                     <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase">Map Brightness (%)</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Map Opacity (%)</label>
                             <input type="number" id="brightnessInput" min="0" max="100" value="40" 
                                 class="w-12 bg-black border border-gray-700 text-violet-400 text-[10px] font-bold text-center rounded py-0.5"
                                 oninput="updateMapBrightness(this.value, 'slider')">
                         </div>
                         <input type="range" id="brightnessSlider" min="0" max="100" value="40" 
-                            class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                            class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent"
                             oninput="updateMapBrightness(this.value, 'input')">
                     </div>
 
-                    <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Ground Surface</label>
+                    <div class="space-y-2 pt-1 border-t border-gray-800">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Heatmap Scheme</label>
+                        <select id="schemeSelect" onchange="updateScheme(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-violet-400 text-[10px] font-bold">
+                            <option value="violet">Blue & Violet</option>
+                            <option value="thermal">Thermal</option>
+                            <option value="toxic">High Contrast</option>
+                            <option value="grayscale">Technical Grayscale</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Ground Surface</label>
                         <select id="groundType" onchange="updateGround(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-blue-400 text-[10px] font-bold">
-                            <option value="grass">Soft Grass (High Damping)</option>
-                            <option value="compact">Hard Standing (Mid)</option>
-                            <option value="concrete">Concrete / Tarmac (Reflective)</option>
+                            <option value="grass">Soft Grass</option>
+                            <option value="compact">Hard Standing</option>
+                            <option value="concrete">Concrete / Reflective</option>
                         </select>
                     </div>
                 </div>
@@ -209,12 +217,12 @@
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Site Elements
                 </h2>
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-3 gap-2 overflow-y-auto">
                     <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="camping">
                         <span class="text-lg">⛺</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Camping</span>
                     </button>
                     <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="campervans">
-                        <span class="text-lg">🚐</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Campervans</span>
+                        <span class="text-lg">🚐</span><span class="text-[8px] font-bold uppercase leading-tight text-center text-[7px]">Campervans</span>
                     </button>
                     <button onclick="setMode('registration')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="registration">
                         <span class="text-lg">📝</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Registration</span>
@@ -226,12 +234,12 @@
                         <span class="text-lg">🎸</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Stage</span>
                     </button>
                     <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="dancefloor">
-                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Dancefloor</span>
+                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center text-blue-300">Dancefloor</span>
                     </button>
                     <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="bar">
                         <span class="text-lg">🍺</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Bar</span>
                     </button>
-                    <button onclick="setMode('chill')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="chill">
+                    <button onclick="setMode('chillout')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="chillout">
                         <span class="text-lg">🧘</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Chillout</span>
                     </button>
                     <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="kitchen">
@@ -240,8 +248,8 @@
                     <button onclick="setMode('workshop')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="workshop">
                         <span class="text-lg">🔨</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Workshop</span>
                     </button>
-                    <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="fire">
-                        <span class="text-lg">🔥</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Firepit</span>
+                    <button onclick="setMode('firepit')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="firepit">
+                        <span class="text-lg">🔥</span><span class="text-[8px] font-bold uppercase leading-tight text-center text-orange-400">Firepit</span>
                     </button>
                     <button onclick="setMode('showers')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="showers">
                         <span class="text-lg">🚿</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Showers</span>
@@ -259,7 +267,7 @@
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-white"></span> Inspector
                 </h2>
-                <div id="inspector" class="text-[11px] leading-relaxed text-gray-400 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px]">
+                <div id="inspector" class="text-[11px] leading-relaxed text-gray-400 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px] shadow-inner">
                     Select an element to view literal acoustic properties.
                 </div>
             </section>
@@ -269,9 +277,8 @@
         <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
             <canvas id="mapCanvas"></canvas>
             
-            <!-- Mouse Telemetry -->
             <div id="mouseCoords" class="absolute bottom-6 left-6 bg-black/90 backdrop-blur-md px-4 py-3 rounded-lg text-[11px] font-bold border border-gray-800 pointer-events-none shadow-2xl flex gap-6">
-                <div class="text-gray-500 uppercase tracking-tight">Position: <span class="text-white ml-1 font-mono" id="xyDisplay">0, 0</span>m</div>
+                <div class="text-gray-500 uppercase tracking-tight">Pos: <span class="text-white ml-1 font-mono" id="xyDisplay">0, 0</span>m</div>
                 <div class="text-gray-500 uppercase tracking-tight border-l border-gray-800 pl-6">Intensity: <span id="currentDb" class="text-white ml-1 font-mono">-- dB</span></div>
             </div>
         </div>
@@ -310,7 +317,8 @@
 
         const MATERIAL_PRESETS = {
             open: { label: "Air / Open Space", abs: 1, type: 'vol' },
-            fabric: { label: "Fabric / Canvas", abs: 70, type: 'shell' },
+            stretch: { label: "Stretch Tent (Open sides)", abs: 60, type: 'canopy' },
+            fabric: { label: "Fabric / Canvas (Closed)", abs: 70, type: 'shell' },
             padded: { label: "Padded / Soft Goods", abs: 90, type: 'vol' },
             wood: { label: "Wood / Structure", abs: 40, type: 'shell' },
             metal: { label: "Metal / Solid Barrier", abs: 10, type: 'shell' },
@@ -326,13 +334,13 @@
             campervans: { label: 'Campervans', color: '#fbbf24', material: 'metal', vH: 2.5 },
             registration: { label: 'Registration / Welcome', color: '#6366f1', material: 'wood', vH: 2.5 },
             welfare: { label: 'Welfare', color: '#f87171', material: 'fabric', vH: 3 },
-            stage: { label: 'Stage', color: '#8b5cf6', material: 'wood', vH: 6 },
+            stage: { label: 'Stage', color: '#8b5cf6', material: 'stretch', vH: 6 },
             dancefloor: { label: 'Dancefloor', color: '#3b82f6', material: 'human', vH: 0 },
-            bar: { label: 'Bar', color: '#f59e0b', material: 'wood', vH: 3 },
-            chill: { label: 'Chillout', color: '#a855f7', material: 'padded', vH: 3 },
+            bar: { label: 'Bar', color: '#f59e0b', material: 'stretch', vH: 3 },
+            chillout: { label: 'Chillout', color: '#a855f7', material: 'padded', vH: 3 },
             kitchen: { label: 'Kitchen', color: '#3b82f6', material: 'wood', vH: 3 },
             workshop: { label: 'Workshop', color: '#2dd4bf', material: 'wood', vH: 3 },
-            fire: { label: 'Firepit', color: '#fb7185', material: 'open', vH: 0 },
+            firepit: { label: 'Firepit', color: '#fb7185', material: 'open', vH: 0 },
             showers: { label: 'Showers', color: '#0ea5e9', material: 'plastic', vH: 2.5 },
             toilets: { label: 'Toilets', color: '#94a3b8', material: 'plastic', vH: 2.5 },
             seating: { label: 'Seating', color: '#4ade80', material: 'wood', vH: 0.5 }
@@ -340,26 +348,28 @@
 
         const INTENSITY_SCHEMES = {
             violet: (db, alpha) => {
-                if (db > 90) return `rgba(139, 92, 246, ${alpha + 0.3})`;
-                if (db > 75) return `rgba(79, 70, 229, ${alpha + 0.2})`;
-                if (db > 60) return `rgba(37, 99, 235, ${alpha + 0.1})`;
+                if (db > 95) return `rgba(167, 139, 250, ${alpha + 0.5})`;
+                if (db > 85) return `rgba(139, 92, 246, ${alpha + 0.3})`;
+                if (db > 70) return `rgba(99, 102, 241, ${alpha + 0.2})`;
+                if (db > 55) return `rgba(59, 130, 246, ${alpha + 0.1})`;
                 return `rgba(30, 58, 138, ${alpha})`;
             },
             thermal: (db, alpha) => {
-                if (db > 90) return `rgba(239, 68, 68, ${alpha + 0.3})`;
-                if (db > 75) return `rgba(249, 115, 22, ${alpha + 0.2})`;
-                if (db > 60) return `rgba(234, 179, 8, ${alpha + 0.1})`;
-                return `rgba(34, 197, 94, ${alpha})`;
+                if (db > 95) return `rgba(239, 68, 68, ${alpha + 0.4})`;
+                if (db > 80) return `rgba(249, 115, 22, ${alpha + 0.3})`;
+                if (db > 65) return `rgba(234, 179, 8, ${alpha + 0.2})`;
+                if (db > 50) return `rgba(34, 197, 94, ${alpha + 0.1})`;
+                return `rgba(31, 41, 55, ${alpha})`;
             },
             toxic: (db, alpha) => {
-                if (db > 90) return `rgba(255, 255, 255, ${alpha + 0.4})`;
-                if (db > 75) return `rgba(163, 230, 53, ${alpha + 0.3})`;
+                if (db > 90) return `rgba(255, 255, 255, ${alpha + 0.5})`;
+                if (db > 75) return `rgba(190, 242, 100, ${alpha + 0.3})`;
                 if (db > 60) return `rgba(34, 197, 94, ${alpha + 0.2})`;
-                return `rgba(13, 148, 136, ${alpha})`;
+                return `rgba(20, 184, 166, ${alpha})`;
             },
             grayscale: (db, alpha) => {
-                const lightness = Math.min(255, Math.max(0, (db - 40) * 4));
-                return `rgba(${lightness}, ${lightness}, ${lightness}, ${alpha + 0.2})`;
+                const l = Math.min(255, Math.max(0, (db - 35) * 4));
+                return `rgba(${l}, ${l}, ${l}, ${alpha + 0.3})`;
             }
         };
 
@@ -441,7 +451,7 @@
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url;
-            a.download = `acoustic-planner-export-${Date.now()}.json`; a.click();
+            a.download = `site-acoustic-planner-v4-${Date.now()}.json`; a.click();
         }
 
         function loadProject(e) {
@@ -455,6 +465,10 @@
                     noiseFloor = d.noiseFloor || 35; groundFactor = d.groundFactor || 1.0;
                     windSpeed = d.windSpeed || 0; windDir = d.windDir || 0;
                     currentScheme = d.currentScheme || 'violet';
+                    scaleInput.value = scaleSlider.value = scale;
+                    document.getElementById('brightnessInput').value = document.getElementById('brightnessSlider').value = mapOpacity;
+                    document.getElementById('noiseFloorInput').value = document.getElementById('noiseFloorSlider').value = noiseFloor;
+                    document.getElementById('schemeSelect').value = currentScheme;
                     selectedItem = null; updateInspector(); render();
                 } catch (err) { console.error("Load failed"); }
             };
@@ -517,6 +531,11 @@
             if (mode === 'ruler' && rulerStart) { rulerEnd = pos; render(); return; }
             const db = calculateTotalDb(pos.x, pos.y);
             currentDbLabel.textContent = `${Math.round(db)} dB`;
+            
+            // Hover Feedback
+            const isHover = items.some(item => isPointInItem(pos.x, pos.y, item));
+            canvas.style.cursor = isHover ? 'pointer' : (mode === 'ruler' ? 'crosshair' : 'default');
+
             if (isDragging && selectedItem) { selectedItem.x = pos.x - dragOffset.x; selectedItem.y = pos.y - dragOffset.y; render(); }
         }
 
@@ -532,7 +551,7 @@
                 let intensity = calculateIntensity(s, x, y, objs);
                 total += intensity;
                 objs.forEach(o => {
-                    if (o.material !== 'open') {
+                    if (o.material !== 'open' && o.material !== 'stretch') {
                         const imgS = getMirroredPoint(s.x, s.y, o);
                         const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / scale);
                         const loss = -10 * Math.log10(1 - (Math.min(99, o.absorption) / 100));
@@ -551,8 +570,7 @@
             if (windSpeed > 0) {
                 const angleToPoint = Math.atan2(ty - s.y, tx - s.x);
                 const windRad = windDir * (Math.PI / 180);
-                const cosDiff = Math.cos(angleToPoint - windRad);
-                db += (windSpeed / 20) * cosDiff * (distM / 50);
+                db += (windSpeed / 25) * Math.cos(angleToPoint - windRad) * (distM / 40);
             }
 
             if (s.beam < 360) {
@@ -561,12 +579,15 @@
                 if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS;
             }
             objs.forEach(o => {
-                if (isPointInItem(s.x, s.y, o) && isPointInItem(tx, ty, o) && MATERIAL_PRESETS[o.material].type === 'shell') return;
+                const sIn = isPointInItem(s.x, s.y, o), tIn = isPointInItem(tx, ty, o);
+                const m = MATERIAL_PRESETS[o.material];
+                if (m.type === 'canopy') return;
+                if (m.type === 'shell' && sIn && tIn) return;
                 const iL = getIntersectionLength(s.x, s.y, tx, ty, o);
                 if (iL > 0) {
                     const bass = 1 - (s.bassBias / 120);
-                    const diffraction = s.vHeight > o.vHeight ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3) : 1.0;
-                    if (o.vHeight > 0.5) db -= (Math.min(20, o.vHeight * 4) * bass * diffraction);
+                    const diffra = s.vHeight > o.vHeight ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3) : 1.0;
+                    if (o.vHeight > 0.5) db -= (Math.min(22, o.vHeight * 4.5) * bass * diffra);
                     else db -= ((iL / scale) * (o.absorption / 10)) * bass;
                 }
             });
@@ -576,8 +597,7 @@
         function getIntersectionLength(x1, y1, x2, y2, r) {
             const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rad = -r.angle * Math.PI / 180;
             const rot = (px, py) => { const dx = px - cx, dy = py - cy; return { x: dx * Math.cos(rad) - dy * Math.sin(rad), y: dx * Math.sin(rad) + dy * Math.cos(rad) }; };
-            const p1 = rot(x1, y1), p2 = rot(x2, y2);
-            const minX = -r.w/2, maxX = r.w/2, minY = -r.h/2, maxY = r.h/2;
+            const p1 = rot(x1, y1), p2 = rot(x2, y2), minX = -r.w/2, maxX = r.w/2, minY = -r.h/2, maxY = r.h/2;
             let tMin = 0, tMax = 1, dx = p2.x - p1.x, dy = p2.y - p1.y;
             const clip = (p, q) => { if (p === 0) return q >= 0; const t = q / p; if (p < 0) { if (t > tMax) return false; if (t > tMin) tMin = t; } else { if (t < tMin) return false; if (t < tMax) tMax = t; } return true; };
             if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) && clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) { if (tMax > tMin) return Math.hypot((tMax - tMin) * dx, (tMax - tMin) * dy); }
@@ -599,6 +619,123 @@
             return false;
         }
 
+        function syncInput(p, v, t, mi, ma) {
+            let val = parseFloat(v); if (isNaN(val)) return; val = Math.max(mi, Math.min(ma, val)); 
+            if (selectedItem) selectedItem[p] = val;
+            const c = document.getElementById('inspector');
+            const s = c.querySelector(`input[type=range][data-prop="${p}"]`), n = c.querySelector(`input[type=number][data-prop="${p}"]`);
+            if (t === 'slider' && s) s.value = val; if (t === 'number' && n) n.value = val; render();
+        }
+
+        function updateMaterial(matKey) {
+            if (!selectedItem) return;
+            selectedItem.material = matKey; selectedItem.absorption = MATERIAL_PRESETS[matKey].abs;
+            updateInspector(); render();
+        }
+
+        function render(tCtx = ctx, tW = width, tH = height, isEx = false) {
+            tCtx.clearRect(0, 0, tW, tH);
+            const ex = tW / width;
+            if (backgroundImage) {
+                tCtx.globalAlpha = mapOpacity / 100;
+                const r = backgroundImage.width / backgroundImage.height; let dw = tW, dh = tW / r; if (r < tW / tH) { dh = tH; dw = tH * r; }
+                tCtx.drawImage(backgroundImage, (tW - dw) / 2, (tH - dh) / 2, dw, dh); tCtx.globalAlpha = 1.0;
+            }
+            
+            const stepSize = isEx ? 4 : 8; 
+            tCtx.save();
+            if (!isEx) tCtx.filter = 'blur(10px)'; // Heatmap Smoothing
+            for (let x = 0; x < tW; x += stepSize) {
+                for (let y = 0; y < tH; y += stepSize) {
+                    const db = calculateTotalDb(x / ex, y / ex);
+                    if (db > noiseFloor + 1) {
+                        const col = INTENSITY_SCHEMES[currentScheme](db, Math.min(0.25, (db - 30) / 120));
+                        tCtx.fillStyle = col; tCtx.fillRect(x, y, stepSize + 1, stepSize + 1);
+                    }
+                }
+            }
+            tCtx.restore();
+
+            // Schedule Render
+            const sch = items.filter(i => i.type !== 'source');
+            if (sch.length > 0) {
+                const pad = 15 * ex, iH = 22 * ex, pW = 320 * ex, pH = (sch.length * iH) + (55 * ex);
+                tCtx.save(); tCtx.translate(tW - pW - pad, pad); tCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                tCtx.beginPath(); tCtx.roundRect(0, 0, pW, pH, 10 * ex); tCtx.fill();
+                tCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)'; tCtx.lineWidth = 2 * ex; tCtx.stroke();
+                tCtx.fillStyle = 'white'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.fillText("SITE ACOUSTIC SCHEDULE", 15 * ex, 25 * ex);
+                sch.forEach((o, i) => {
+                    const y = 55 * ex + (i * iH); const dbV = calculateTotalDb(o.x + o.w/2, o.y + o.h/2);
+                    tCtx.fillStyle = 'rgba(255,255,255,0.6)'; tCtx.font = `${9 * ex}px Inter`; tCtx.fillText(o.material.toUpperCase(), 15 * ex, y);
+                    tCtx.fillStyle = 'white'; tCtx.font = `700 ${10 * ex}px Inter`; tCtx.fillText(o.label, 110 * ex, y);
+                    tCtx.fillStyle = '#8b5cf6'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText(`${Math.round(dbV)} dB`, pW - 15 * ex, y); tCtx.textAlign = 'start';
+                }); tCtx.restore();
+            }
+
+            // Legend Render
+            const legendW = 40 * ex, legendH = 200 * ex;
+            tCtx.save(); tCtx.translate(15 * ex, padding = 15 * ex);
+            tCtx.fillStyle = 'rgba(0,0,0,0.8)'; tCtx.roundRect(0,0, legendW, legendH + 40 * ex, 8 * ex); tCtx.fill();
+            tCtx.fillStyle = 'white'; tCtx.font = `bold ${8 * ex}px Inter`; tCtx.fillText("INTENSITY (dB)", 5*ex, 15*ex);
+            for(let i=0; i<=100; i+=10) {
+                const db = 30 + i; const y = legendH - (i/100 * legendH) + 25 * ex;
+                tCtx.fillStyle = INTENSITY_SCHEMES[currentScheme](db, 1);
+                tCtx.fillRect(5 * ex, y, 10 * ex, legendH/11);
+                tCtx.fillStyle = 'white'; tCtx.fillText(db, 20 * ex, y + 8 * ex);
+            }
+            tCtx.restore();
+
+            const bP = 20 * ex, bW = 10 * scale * ex, bH = 6 * ex;
+            tCtx.fillStyle = 'white'; tCtx.fillRect(tW - bW - bP, tH - bP - bH, bW, bH);
+            tCtx.font = `bold ${10 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText("10m CALIBRATION BAR", tW - bP, tH - bP - bH - 5); tCtx.textAlign = 'start';
+            
+            if (rulerStart && rulerEnd) {
+                tCtx.beginPath(); tCtx.moveTo(rulerStart.x * ex, rulerStart.y * ex); tCtx.lineTo(rulerEnd.x * ex, rulerEnd.y * ex);
+                tCtx.strokeStyle = '#3b82f6'; tCtx.lineWidth = 2; tCtx.setLineDash([5, 5]); tCtx.stroke(); tCtx.setLineDash([]);
+                const d = Math.hypot(rulerEnd.x - rulerStart.x, rulerEnd.y - rulerStart.y) / scale;
+                tCtx.fillStyle = 'white'; tCtx.font = 'bold 12px Inter'; tCtx.fillText(`${d.toFixed(1)}m`, rulerEnd.x * ex + 10, rulerEnd.y * ex);
+            }
+
+            items.forEach(item => {
+                const cx = (item.x + (item.w ? item.w / 2 : 0)) * ex, cy = (item.y + (item.h ? item.h / 2 : 0)) * ex, w = (item.w || 0) * ex, h = (item.h || 0) * ex;
+                tCtx.save(); tCtx.translate(cx, cy); tCtx.rotate(item.angle * Math.PI / 180);
+                
+                // Pulsing Selection Glow
+                if (!isEx && selectedItem === item) {
+                    tCtx.shadowColor = '#8b5cf6';
+                    tCtx.shadowBlur = 15 + Math.sin(Date.now() / 200) * 5;
+                }
+
+                if (item.type === 'source') {
+                    if (item.beam < 360) {
+                        tCtx.beginPath(); tCtx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180);
+                        tCtx.arc(0, 0, 40 * ex, sA, eA); tCtx.lineTo(0, 0); tCtx.fillStyle = 'rgba(139, 92, 246, 0.2)'; tCtx.fill();
+                    }
+                    tCtx.beginPath(); tCtx.arc(0, 0, 8 * ex, 0, Math.PI * 2); tCtx.fillStyle = '#8b5cf6'; tCtx.fill();
+                    tCtx.beginPath(); tCtx.moveTo(6 * ex, 0); tCtx.lineTo(12 * ex, 0); tCtx.lineWidth = 3 * ex; tCtx.strokeStyle = 'white'; tCtx.stroke();
+                    if (!isEx && selectedItem === item) { tCtx.strokeStyle = 'white'; tCtx.lineWidth = 2; tCtx.stroke(); }
+                } else {
+                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
+                    tCtx.fillStyle = cfg.color + '22'; tCtx.fillRect(-w/2, -h/2, w, h);
+                    tCtx.strokeStyle = (!isEx && selectedItem === item) ? '#ffffff' : cfg.color; 
+                    tCtx.lineWidth = 2 * ex; tCtx.strokeRect(-w/2, -h/2, w, h);
+                    tCtx.fillStyle = 'white'; tCtx.font = `900 ${10 * ex}px Inter`; tCtx.shadowColor = 'black'; tCtx.shadowBlur = 4 * ex;
+                    tCtx.fillText(item.label, -w/2 + 5 * ex, -h/2 + 15 * ex);
+                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
+                    tCtx.font = `bold ${10 * ex}px Inter`; tCtx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5 * ex, h/2 - 5 * ex); tCtx.shadowBlur = 0;
+                }
+                tCtx.restore();
+            });
+            if (!isEx) requestAnimationFrame(() => {}); // Maintain pulse
+        }
+
+        function downloadMap() {
+            const eW = 3000, eH = eW * (height / width), tC = document.createElement('canvas'); tC.width = eW; tC.height = eH;
+            const tCtx = tC.getContext('2d'); tCtx.fillStyle = '#030712'; tCtx.fillRect(0, 0, eW, eH);
+            render(tCtx, eW, eH, true);
+            const l = document.createElement('a'); l.download = `acoustic-site-plan-${Date.now()}.png`; l.href = tC.toDataURL('image/png'); l.click();
+        }
+
         function updateInspector() {
             if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-700">Select an element to edit details.</p>`; return; }
             const isS = selectedItem.type === 'source';
@@ -606,7 +743,7 @@
             if (isS) {
                 h += `
                     <div class="bg-black p-2 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label><input type="number" data-prop="db" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label><input type="number" data-prop="db" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-700 text-violet-400 text-[10px] text-center rounded"></div>
                         <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('db', this.value, 'number', 60, 130)">
                     </div>
                     <div class="bg-black p-2 rounded border border-gray-800">
@@ -631,98 +768,9 @@
             inspector.innerHTML = h;
         }
 
-        function syncInput(p, v, t, mi, ma) {
-            let val = parseFloat(v); if (isNaN(val)) return; val = Math.max(mi, Math.min(ma, val)); selectedItem[p] = val;
-            const c = document.getElementById('inspector');
-            const s = c.querySelector(`input[type=range][data-prop="${p}"]`), n = c.querySelector(`input[type=number][data-prop="${p}"]`);
-            if (t === 'slider' && s) s.value = val; if (t === 'number' && n) n.value = val; render();
-        }
-
-        function updateMaterial(matKey) {
-            selectedItem.material = matKey;
-            selectedItem.absorption = MATERIAL_PRESETS[matKey].abs;
-            updateInspector();
-            render();
-        }
-
-        function render(tCtx = ctx, tW = width, tH = height, isEx = false) {
-            tCtx.clearRect(0, 0, tW, tH);
-            if (backgroundImage) {
-                tCtx.globalAlpha = mapOpacity / 100;
-                const r = backgroundImage.width / backgroundImage.height; let dw = tW, dh = tW / r; if (r < tW / tH) { dh = tH; dw = tH * r; }
-                tCtx.drawImage(backgroundImage, (tW - dw) / 2, (tH - dh) / 2, dw, dh); tCtx.globalAlpha = 1.0;
-            }
-            const s = isEx ? 4 : 8, ex = tW / width;
-            for (let x = 0; x < tW; x += s) {
-                for (let y = 0; y < tH; y += s) {
-                    const db = calculateTotalDb(x / ex, y / ex);
-                    if (db > noiseFloor + 1) {
-                        const col = INTENSITY_SCHEMES[currentScheme](db, Math.min(0.3, (db - 35) / 100));
-                        tCtx.fillStyle = col; tCtx.fillRect(x, y, s, s);
-                    }
-                }
-            }
-            // Schedule Render
-            const sch = items.filter(i => i.type !== 'source');
-            if (sch.length > 0) {
-                const pad = 15 * ex, iH = 22 * ex, pW = 320 * ex, pH = (sch.length * iH) + (55 * ex);
-                tCtx.save(); tCtx.translate(tW - pW - pad, pad); tCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                tCtx.beginPath(); tCtx.roundRect(0, 0, pW, pH, 10 * ex); tCtx.fill();
-                tCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)'; tCtx.lineWidth = 2 * ex; tCtx.stroke();
-                tCtx.fillStyle = 'white'; tCtx.font = `900 ${11 * ex} Inter`; tCtx.fillText("SITE ACOUSTIC SCHEDULE", 15 * ex, 25 * ex);
-                sch.forEach((o, i) => {
-                    const y = 55 * ex + (i * iH); const dbV = calculateTotalDb(o.x + o.w/2, o.y + o.h/2);
-                    tCtx.fillStyle = 'rgba(255,255,255,0.6)'; tCtx.font = `${9 * ex}px Inter`; tCtx.fillText(o.material.toUpperCase(), 15 * ex, y);
-                    tCtx.fillStyle = 'white'; tCtx.font = `700 ${10 * ex}px Inter`; tCtx.fillText(o.label, 100 * ex, y);
-                    tCtx.fillStyle = '#8b5cf6'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText(`${Math.round(dbV)} dB`, pW - 15 * ex, y); tCtx.textAlign = 'start';
-                }); tCtx.restore();
-            }
-            // Calibration bar
-            const bP = 20 * ex, bW = 10 * scale * ex, bH = 6 * ex;
-            tCtx.fillStyle = 'white'; tCtx.fillRect(tW - bW - bP, tH - bP - bH, bW, bH);
-            tCtx.font = `bold ${10 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText("10m CALIBRATION BAR", tW - bP, tH - bP - bH - 5); tCtx.textAlign = 'start';
-            
-            if (rulerStart && rulerEnd) {
-                tCtx.beginPath(); tCtx.moveTo(rulerStart.x * ex, rulerStart.y * ex); tCtx.lineTo(rulerEnd.x * ex, rulerEnd.y * ex);
-                tCtx.strokeStyle = '#3b82f6'; tCtx.lineWidth = 2; tCtx.setLineDash([5, 5]); tCtx.stroke(); tCtx.setLineDash([]);
-                const d = Math.hypot(rulerEnd.x - rulerStart.x, rulerEnd.y - rulerStart.y) / scale;
-                tCtx.fillStyle = 'white'; tCtx.font = 'bold 12px Inter'; tCtx.fillText(`${d.toFixed(1)}m`, rulerEnd.x * ex + 10, rulerEnd.y * ex);
-            }
-
-            items.forEach(item => {
-                const cx = (item.x + (item.w ? item.w / 2 : 0)) * ex, cy = (item.y + (item.h ? item.h / 2 : 0)) * ex, w = (item.w || 0) * ex, h = (item.h || 0) * ex;
-                tCtx.save(); tCtx.translate(cx, cy); tCtx.rotate(item.angle * Math.PI / 180);
-                if (item.type === 'source') {
-                    if (item.beam < 360) {
-                        tCtx.beginPath(); tCtx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180);
-                        tCtx.arc(0, 0, 40 * ex, sA, eA); tCtx.lineTo(0, 0); tCtx.fillStyle = 'rgba(139, 92, 246, 0.2)'; tCtx.fill();
-                    }
-                    tCtx.beginPath(); tCtx.arc(0, 0, 8 * ex, 0, Math.PI * 2); tCtx.fillStyle = '#8b5cf6'; tCtx.fill();
-                    tCtx.beginPath(); tCtx.moveTo(6 * ex, 0); tCtx.lineTo(12 * ex, 0); tCtx.lineWidth = 3 * ex; tCtx.strokeStyle = 'white'; tCtx.stroke();
-                    if (!isEx && selectedItem === item) { tCtx.strokeStyle = 'white'; tCtx.lineWidth = 2; tCtx.stroke(); }
-                } else {
-                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
-                    tCtx.fillStyle = cfg.color + '22'; tCtx.fillRect(-w/2, -h/2, w, h);
-                    tCtx.strokeStyle = (!isEx && selectedItem === item) ? '#ffffff' : cfg.color; 
-                    tCtx.lineWidth = 2 * ex; tCtx.strokeRect(-w/2, -h/2, w, h);
-                    tCtx.fillStyle = 'white'; tCtx.font = `900 ${10 * ex}px Inter`; tCtx.shadowColor = 'black'; tCtx.shadowBlur = 4 * ex;
-                    tCtx.fillText(item.label, -w/2 + 5 * ex, -h/2 + 15 * ex);
-                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    tCtx.font = `bold ${10 * ex}px Inter`; tCtx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5 * ex, h/2 - 5 * ex); tCtx.shadowBlur = 0;
-                }
-                tCtx.restore();
-            });
-        }
-
-        function downloadMap() {
-            const eW = 3000, eH = eW * (height / width), tC = document.createElement('canvas'); tC.width = eW; tC.height = eH;
-            const tCtx = tC.getContext('2d'); tCtx.fillStyle = '#030712'; tCtx.fillRect(0, 0, eW, eH);
-            render(tCtx, eW, eH, true);
-            const l = document.createElement('a'); l.download = `acoustic-master-plan-${Date.now()}.png`; l.href = tC.toDataURL('image/png'); l.click();
-        }
-
         function setMode(m) { mode = m; document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode)); }
         window.onload = init;
+        setInterval(render, 100); // Trigger animation loop for pulses
     </script>
 </body>
 </html>
