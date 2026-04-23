@@ -94,7 +94,7 @@
                 </label>
             </div>
             <label class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded cursor-pointer transition-colors border border-gray-700 text-center">
-                Map Upload
+                Upload Map
                 <input type="file" id="mapUpload" class="hidden" accept="image/*">
             </label>
             <button id="downloadBtn" class="theme-gradient text-white text-[10px] font-black uppercase px-3 py-1.5 rounded shadow-lg hover:brightness-110 transition-all">
@@ -169,7 +169,7 @@
                     </div>
 
                     <div class="space-y-2 pt-1 border-t border-gray-800">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Heatmap Scheme</label>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Heatmap Theme</label>
                         <select id="schemeSelect" onchange="updateScheme(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-violet-400 text-[10px] font-bold">
                             <option value="violet">Blue & Violet</option>
                             <option value="thermal">Thermal</option>
@@ -217,7 +217,7 @@
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Site Elements
                 </h2>
-                <div class="grid grid-cols-3 gap-2 overflow-y-auto">
+                <div class="grid grid-cols-3 gap-2">
                     <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="camping">
                         <span class="text-lg">⛺</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Camping</span>
                     </button>
@@ -268,12 +268,11 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-white"></span> Inspector
                 </h2>
                 <div id="inspector" class="text-[11px] leading-relaxed text-gray-400 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px] shadow-inner">
-                    Select an element to view literal acoustic properties.
+                    Select an element to view technical properties.
                 </div>
             </section>
         </aside>
 
-        <!-- Map Area -->
         <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
             <canvas id="mapCanvas"></canvas>
             
@@ -312,21 +311,24 @@
         let rulerStart = null;
         let rulerEnd = null;
         let backgroundImage = null;
+        
+        let offscreenHeatmap = document.createElement('canvas');
+        let needsHeatmapUpdate = true;
 
         const ATTENUATION_OFF_AXIS = 20;
 
         const MATERIAL_PRESETS = {
-            open: { label: "Air / Open Space", abs: 1, type: 'vol' },
-            stretch: { label: "Stretch Tent (Open sides)", abs: 60, type: 'canopy' },
-            fabric: { label: "Fabric / Canvas (Closed)", abs: 70, type: 'shell' },
-            padded: { label: "Padded / Soft Goods", abs: 90, type: 'vol' },
-            wood: { label: "Wood / Structure", abs: 40, type: 'shell' },
-            metal: { label: "Metal / Solid Barrier", abs: 10, type: 'shell' },
-            concrete: { label: "Concrete / Massive", abs: 5, type: 'shell' },
-            heras: { label: "Metal Mesh / Heras", abs: 15, type: 'shell' },
-            plastic: { label: "Plastic / PVC Shell", abs: 50, type: 'shell' },
-            foliage: { label: "Dense Foliage / Hedge", abs: 65, type: 'vol' },
-            human: { label: "Crowd / People", abs: 60, type: 'vol' }
+            open: { label: "Air / Open Space", abs: 1, blocking: 0.05, type: 'vol' },
+            stretch: { label: "Stretch Tent (Open sides)", abs: 60, blocking: 0, type: 'canopy' },
+            fabric: { label: "Fabric / Canvas (Closed)", abs: 70, blocking: 0.35, type: 'shell' },
+            padded: { label: "Padded / Soft Goods", abs: 90, blocking: 0.6, type: 'vol' },
+            wood: { label: "Wood / Structure", abs: 40, blocking: 0.55, type: 'shell' },
+            metal: { label: "Metal / Solid Barrier", abs: 10, blocking: 0.85, type: 'shell' },
+            concrete: { label: "Concrete / Massive", abs: 5, blocking: 0.95, type: 'shell' },
+            heras: { label: "Metal Mesh / Heras", abs: 15, blocking: 0.1, type: 'shell' },
+            plastic: { label: "Plastic / PVC Shell", abs: 50, blocking: 0.45, type: 'shell' },
+            foliage: { label: "Dense Foliage / Hedge", abs: 65, blocking: 0.25, type: 'vol' },
+            human: { label: "Crowd / People", abs: 60, blocking: 0.4, type: 'vol' }
         };
 
         const ZONE_CONFIG = {
@@ -377,29 +379,18 @@
             const container = canvas.parentElement;
             width = container.clientWidth;
             height = container.clientHeight;
-            canvas.width = width;
-            canvas.height = height;
-            render();
+            canvas.width = width; canvas.height = height;
+            offscreenHeatmap.width = width; offscreenHeatmap.height = height;
+            triggerUpdate();
         }
 
-        function saveHistory() {
-            history.push(JSON.stringify(items));
-            if (history.length > 30) history.shift();
-        }
-
-        function undo() {
-            if (history.length === 0) return;
-            items = JSON.parse(history.pop());
-            selectedItem = null;
-            updateInspector();
-            render();
-        }
+        function triggerUpdate() { needsHeatmapUpdate = true; }
 
         function updateGlobalScale(val, syncId) {
             scale = parseInt(val) || 10;
             if (syncId === 'input') scaleInput.value = val;
             if (syncId === 'slider') scaleSlider.value = val;
-            render();
+            triggerUpdate();
         }
 
         function updateMapBrightness(val, syncId) {
@@ -413,45 +404,36 @@
             noiseFloor = parseInt(val) || 20;
             if (syncId === 'input') document.getElementById('noiseFloorInput').value = val;
             if (syncId === 'slider') document.getElementById('noiseFloorSlider').value = val;
-            render();
+            triggerUpdate();
         }
 
         function updateWind(val, type) {
             if (type === 'speed') windSpeed = parseFloat(val) || 0;
             if (type === 'dir') windDir = parseFloat(val) || 0;
-            render();
+            triggerUpdate();
         }
 
         function updateGround(val) {
             if (val === 'grass') groundFactor = 1.3;
             else if (val === 'compact') groundFactor = 1.0;
             else groundFactor = 0.7;
-            render();
+            triggerUpdate();
         }
 
-        function updateScheme(val) {
-            currentScheme = val;
-            render();
-        }
+        function updateScheme(val) { currentScheme = val; triggerUpdate(); }
 
         function duplicateSelected() {
             if (!selectedItem) return;
-            saveHistory();
             const newItem = JSON.parse(JSON.stringify(selectedItem));
-            newItem.id = Date.now();
-            newItem.x += 20; newItem.y += 20;
-            items.push(newItem);
-            selectedItem = newItem;
-            updateInspector();
-            render();
+            newItem.id = Date.now(); newItem.x += 20; newItem.y += 20;
+            items.push(newItem); selectedItem = newItem; updateInspector(); triggerUpdate();
         }
 
         function saveProject() {
             const data = { items, scale, mapOpacity, noiseFloor, groundFactor, windSpeed, windDir, currentScheme };
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url;
-            a.download = `site-acoustic-planner-v4-${Date.now()}.json`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `acoustic-planner-${Date.now()}.json`; a.click();
         }
 
         function loadProject(e) {
@@ -469,7 +451,7 @@
                     document.getElementById('brightnessInput').value = document.getElementById('brightnessSlider').value = mapOpacity;
                     document.getElementById('noiseFloorInput').value = document.getElementById('noiseFloorSlider').value = noiseFloor;
                     document.getElementById('schemeSelect').value = currentScheme;
-                    selectedItem = null; updateInspector(); render();
+                    selectedItem = null; updateInspector(); triggerUpdate();
                 } catch (err) { console.error("Load failed"); }
             };
             reader.readAsText(file);
@@ -480,63 +462,50 @@
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
-            document.getElementById('clearBtn').onclick = () => { saveHistory(); items = []; selectedItem = null; render(); };
-            document.getElementById('undoBtn').onclick = undo;
+            document.getElementById('clearBtn').onclick = () => { items = []; selectedItem = null; triggerUpdate(); };
+            document.getElementById('undoBtn').onclick = () => { if (history.length) { items = JSON.parse(history.pop()); triggerUpdate(); } };
             document.getElementById('downloadBtn').onclick = downloadMap;
             document.getElementById('saveBtn').onclick = saveProject;
             document.getElementById('projectLoad').addEventListener('change', loadProject);
             document.getElementById('mapUpload').addEventListener('change', handleMapUpload);
-            setMode('source'); render();
+            setMode('source'); setInterval(render, 50); 
         }
 
         function handleMapUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const r = new FileReader();
-            r.onload = (ev) => { const img = new Image(); img.onload = () => { backgroundImage = img; render(); }; img.src = ev.target.result; };
-            r.readAsDataURL(file);
+            const file = e.target.files[0]; if (!file) return;
+            const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { backgroundImage = img; render(); }; img.src = ev.target.result; }; r.readAsDataURL(file);
         }
 
         function isPointInItem(px, py, item) {
             if (item.type === 'source') return Math.hypot(item.x - px, item.y - py) < 15;
-            const cx = item.x + item.w / 2; const cy = item.y + item.h / 2;
-            const r = -item.angle * Math.PI / 180;
-            const dx = px - cx, dy = py - cy;
-            const lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
+            const cx = item.x + item.w / 2, cy = item.y + item.h / 2, rad = -item.angle * Math.PI / 180;
+            const dx = px - cx, dy = py - cy, lx = dx * Math.cos(rad) - dy * Math.sin(rad), ly = dx * Math.sin(rad) + dy * Math.cos(rad);
             return lx >= -item.w/2 && lx <= item.w/2 && ly >= -item.h/2 && ly <= item.h/2;
         }
 
         function handleMouseDown(e) {
             const pos = getMousePos(e);
-            if (mode === 'ruler') { rulerStart = pos; rulerEnd = pos; render(); return; }
+            if (mode === 'ruler') { rulerStart = pos; rulerEnd = pos; return; }
             const hit = [...items].reverse().find(item => isPointInItem(pos.x, pos.y, item));
             if (hit) {
-                if (mode === 'delete') { saveHistory(); items = items.filter(i => i !== hit); selectedItem = null; }
-                else { saveHistory(); selectedItem = hit; isDragging = true; dragOffset.x = pos.x - hit.x; dragOffset.y = pos.y - hit.y; }
-                updateInspector(); render(); return;
+                if (mode === 'delete') { items = items.filter(i => i !== hit); selectedItem = null; triggerUpdate(); }
+                else { selectedItem = hit; isDragging = true; dragOffset.x = pos.x - hit.x; dragOffset.y = pos.y - hit.y; }
+                updateInspector(); return;
             }
             if (mode === 'delete' || mode === 'ruler') return;
-            saveHistory();
+            history.push(JSON.stringify(items));
             const newItem = { id: Date.now(), angle: 0 };
             if (mode === 'source') { newItem.type = 'source'; newItem.x = pos.x; newItem.y = pos.y; newItem.db = 100; newItem.beam = 90; newItem.bassBias = 50; newItem.vHeight = 4; }
-            else if (mode === 'barrier') { newItem.type = 'barrier'; newItem.x = pos.x - 40; newItem.y = pos.y - 10; newItem.w = 80; newItem.h = 20; newItem.vHeight = 4; newItem.label = "Barrier"; newItem.material = 'wood'; newItem.absorption = 40; }
             else if (ZONE_CONFIG[mode]) { const cfg = ZONE_CONFIG[mode]; newItem.type = mode; newItem.x = pos.x - 50; newItem.y = pos.y - 50; newItem.w = 100; newItem.h = 100; newItem.vHeight = cfg.vH; newItem.label = cfg.label; newItem.material = cfg.material; newItem.absorption = MATERIAL_PRESETS[cfg.material].abs; }
-            else { return; }
-            items.push(newItem); selectedItem = newItem; updateInspector(); render();
+            else if (mode === 'barrier') { newItem.type = 'barrier'; newItem.x = pos.x - 40; newItem.y = pos.y - 10; newItem.w = 80; newItem.h = 20; newItem.vHeight = 4; newItem.label = "Barrier"; newItem.material = 'wood'; newItem.absorption = 40; }
+            items.push(newItem); selectedItem = newItem; updateInspector(); triggerUpdate();
         }
 
         function handleMouseMove(e) {
-            const pos = getMousePos(e);
-            xyDisplay.textContent = `${Math.round(pos.x/scale)}, ${Math.round(pos.y/scale)}`;
-            if (mode === 'ruler' && rulerStart) { rulerEnd = pos; render(); return; }
-            const db = calculateTotalDb(pos.x, pos.y);
-            currentDbLabel.textContent = `${Math.round(db)} dB`;
-            
-            // Hover Feedback
-            const isHover = items.some(item => isPointInItem(pos.x, pos.y, item));
-            canvas.style.cursor = isHover ? 'pointer' : (mode === 'ruler' ? 'crosshair' : 'default');
-
-            if (isDragging && selectedItem) { selectedItem.x = pos.x - dragOffset.x; selectedItem.y = pos.y - dragOffset.y; render(); }
+            const pos = getMousePos(e); xyDisplay.textContent = `${Math.round(pos.x/scale)}, ${Math.round(pos.y/scale)}`;
+            if (mode === 'ruler' && rulerStart) { rulerEnd = pos; return; }
+            const db = calculateTotalDb(pos.x, pos.y); currentDbLabel.textContent = `${Math.round(db)} dB`;
+            if (isDragging && selectedItem) { selectedItem.x = pos.x - dragOffset.x; selectedItem.y = pos.y - dragOffset.y; triggerUpdate(); }
         }
 
         function handleMouseUp() { isDragging = false; rulerStart = null; rulerEnd = null; render(); }
@@ -548,10 +517,10 @@
             const sources = items.filter(i => i.type === 'source');
             const objs = items.filter(i => i.type !== 'source');
             sources.forEach(s => {
-                let intensity = calculateIntensity(s, x, y, objs);
-                total += intensity;
+                let intensity = calculateIntensity(s, x, y, objs); total += intensity;
                 objs.forEach(o => {
-                    if (o.material !== 'open' && o.material !== 'stretch') {
+                    const m = MATERIAL_PRESETS[o.material];
+                    if (m.type !== 'vol' && m.blocking > 0.1) {
                         const imgS = getMirroredPoint(s.x, s.y, o);
                         const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / scale);
                         const loss = -10 * Math.log10(1 - (Math.min(99, o.absorption) / 100));
@@ -566,28 +535,17 @@
         function calculateIntensity(s, tx, ty, objs) {
             const distM = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
             let db = s.db - (20 * groundFactor * Math.log10(distM));
-            
-            if (windSpeed > 0) {
-                const angleToPoint = Math.atan2(ty - s.y, tx - s.x);
-                const windRad = windDir * (Math.PI / 180);
-                db += (windSpeed / 25) * Math.cos(angleToPoint - windRad) * (distM / 40);
-            }
-
-            if (s.beam < 360) {
-                const aP = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI);
-                let diff = Math.abs(aP - s.angle) % 360; if (diff > 180) diff = 360 - diff;
-                if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS;
-            }
+            if (windSpeed > 0) { const aP = Math.atan2(ty - s.y, tx - s.x), wR = windDir * (Math.PI / 180); db += (windSpeed / 25) * Math.cos(aP - wR) * (distM / 40); }
+            if (s.beam < 360) { const aP = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI); let diff = Math.abs(aP - s.angle) % 360; if (diff > 180) diff = 360 - diff; if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS; }
             objs.forEach(o => {
-                const sIn = isPointInItem(s.x, s.y, o), tIn = isPointInItem(tx, ty, o);
-                const m = MATERIAL_PRESETS[o.material];
+                const sIn = isPointInItem(s.x, s.y, o), tIn = isPointInItem(tx, ty, o), m = MATERIAL_PRESETS[o.material];
                 if (m.type === 'canopy') return;
                 if (m.type === 'shell' && sIn && tIn) return;
                 const iL = getIntersectionLength(s.x, s.y, tx, ty, o);
                 if (iL > 0) {
                     const bass = 1 - (s.bassBias / 120);
                     const diffra = s.vHeight > o.vHeight ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3) : 1.0;
-                    if (o.vHeight > 0.5) db -= (Math.min(22, o.vHeight * 4.5) * bass * diffra);
+                    if (o.vHeight > 0.5) db -= (Math.min(22, o.vHeight * 6) * m.blocking * bass * diffra);
                     else db -= ((iL / scale) * (o.absorption / 10)) * bass;
                 }
             });
@@ -619,122 +577,28 @@
             return false;
         }
 
+        function updateHeatmapLayer() {
+            const tCtx = offscreenHeatmap.getContext('2d'); tCtx.clearRect(0, 0, width, height);
+            const step = 12; 
+            for (let x = 0; x < width; x += step) {
+                for (let y = 0; y < height; y += step) {
+                    const db = calculateTotalDb(x, y);
+                    if (db > noiseFloor + 1) { tCtx.fillStyle = INTENSITY_SCHEMES[currentScheme](db, Math.min(0.25, (db - 30) / 120)); tCtx.fillRect(x, y, step + 1, step + 1); }
+                }
+            }
+            needsHeatmapUpdate = false;
+        }
+
         function syncInput(p, v, t, mi, ma) {
             let val = parseFloat(v); if (isNaN(val)) return; val = Math.max(mi, Math.min(ma, val)); 
             if (selectedItem) selectedItem[p] = val;
             const c = document.getElementById('inspector');
-            const s = c.querySelector(`input[type=range][data-prop="${p}"]`), n = c.querySelector(`input[type=number][data-prop="${p}"]`);
-            if (t === 'slider' && s) s.value = val; if (t === 'number' && n) n.value = val; render();
+            const s = c.querySelector(`input[type=range][data-sync="${p}"]`), n = c.querySelector(`input[type=number][data-sync="${p}"]`);
+            if (t === 'slider' && s) s.value = val; if (t === 'number' && n) n.value = val; 
+            triggerUpdate();
         }
 
-        function updateMaterial(matKey) {
-            if (!selectedItem) return;
-            selectedItem.material = matKey; selectedItem.absorption = MATERIAL_PRESETS[matKey].abs;
-            updateInspector(); render();
-        }
-
-        function render(tCtx = ctx, tW = width, tH = height, isEx = false) {
-            tCtx.clearRect(0, 0, tW, tH);
-            const ex = tW / width;
-            if (backgroundImage) {
-                tCtx.globalAlpha = mapOpacity / 100;
-                const r = backgroundImage.width / backgroundImage.height; let dw = tW, dh = tW / r; if (r < tW / tH) { dh = tH; dw = tH * r; }
-                tCtx.drawImage(backgroundImage, (tW - dw) / 2, (tH - dh) / 2, dw, dh); tCtx.globalAlpha = 1.0;
-            }
-            
-            const stepSize = isEx ? 4 : 8; 
-            tCtx.save();
-            if (!isEx) tCtx.filter = 'blur(10px)'; // Heatmap Smoothing
-            for (let x = 0; x < tW; x += stepSize) {
-                for (let y = 0; y < tH; y += stepSize) {
-                    const db = calculateTotalDb(x / ex, y / ex);
-                    if (db > noiseFloor + 1) {
-                        const col = INTENSITY_SCHEMES[currentScheme](db, Math.min(0.25, (db - 30) / 120));
-                        tCtx.fillStyle = col; tCtx.fillRect(x, y, stepSize + 1, stepSize + 1);
-                    }
-                }
-            }
-            tCtx.restore();
-
-            // Schedule Render
-            const sch = items.filter(i => i.type !== 'source');
-            if (sch.length > 0) {
-                const pad = 15 * ex, iH = 22 * ex, pW = 320 * ex, pH = (sch.length * iH) + (55 * ex);
-                tCtx.save(); tCtx.translate(tW - pW - pad, pad); tCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                tCtx.beginPath(); tCtx.roundRect(0, 0, pW, pH, 10 * ex); tCtx.fill();
-                tCtx.strokeStyle = 'rgba(139, 92, 246, 0.6)'; tCtx.lineWidth = 2 * ex; tCtx.stroke();
-                tCtx.fillStyle = 'white'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.fillText("SITE ACOUSTIC SCHEDULE", 15 * ex, 25 * ex);
-                sch.forEach((o, i) => {
-                    const y = 55 * ex + (i * iH); const dbV = calculateTotalDb(o.x + o.w/2, o.y + o.h/2);
-                    tCtx.fillStyle = 'rgba(255,255,255,0.6)'; tCtx.font = `${9 * ex}px Inter`; tCtx.fillText(o.material.toUpperCase(), 15 * ex, y);
-                    tCtx.fillStyle = 'white'; tCtx.font = `700 ${10 * ex}px Inter`; tCtx.fillText(o.label, 110 * ex, y);
-                    tCtx.fillStyle = '#8b5cf6'; tCtx.font = `900 ${11 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText(`${Math.round(dbV)} dB`, pW - 15 * ex, y); tCtx.textAlign = 'start';
-                }); tCtx.restore();
-            }
-
-            // Legend Render
-            const legendW = 40 * ex, legendH = 200 * ex;
-            tCtx.save(); tCtx.translate(15 * ex, padding = 15 * ex);
-            tCtx.fillStyle = 'rgba(0,0,0,0.8)'; tCtx.roundRect(0,0, legendW, legendH + 40 * ex, 8 * ex); tCtx.fill();
-            tCtx.fillStyle = 'white'; tCtx.font = `bold ${8 * ex}px Inter`; tCtx.fillText("INTENSITY (dB)", 5*ex, 15*ex);
-            for(let i=0; i<=100; i+=10) {
-                const db = 30 + i; const y = legendH - (i/100 * legendH) + 25 * ex;
-                tCtx.fillStyle = INTENSITY_SCHEMES[currentScheme](db, 1);
-                tCtx.fillRect(5 * ex, y, 10 * ex, legendH/11);
-                tCtx.fillStyle = 'white'; tCtx.fillText(db, 20 * ex, y + 8 * ex);
-            }
-            tCtx.restore();
-
-            const bP = 20 * ex, bW = 10 * scale * ex, bH = 6 * ex;
-            tCtx.fillStyle = 'white'; tCtx.fillRect(tW - bW - bP, tH - bP - bH, bW, bH);
-            tCtx.font = `bold ${10 * ex}px Inter`; tCtx.textAlign = 'right'; tCtx.fillText("10m CALIBRATION BAR", tW - bP, tH - bP - bH - 5); tCtx.textAlign = 'start';
-            
-            if (rulerStart && rulerEnd) {
-                tCtx.beginPath(); tCtx.moveTo(rulerStart.x * ex, rulerStart.y * ex); tCtx.lineTo(rulerEnd.x * ex, rulerEnd.y * ex);
-                tCtx.strokeStyle = '#3b82f6'; tCtx.lineWidth = 2; tCtx.setLineDash([5, 5]); tCtx.stroke(); tCtx.setLineDash([]);
-                const d = Math.hypot(rulerEnd.x - rulerStart.x, rulerEnd.y - rulerStart.y) / scale;
-                tCtx.fillStyle = 'white'; tCtx.font = 'bold 12px Inter'; tCtx.fillText(`${d.toFixed(1)}m`, rulerEnd.x * ex + 10, rulerEnd.y * ex);
-            }
-
-            items.forEach(item => {
-                const cx = (item.x + (item.w ? item.w / 2 : 0)) * ex, cy = (item.y + (item.h ? item.h / 2 : 0)) * ex, w = (item.w || 0) * ex, h = (item.h || 0) * ex;
-                tCtx.save(); tCtx.translate(cx, cy); tCtx.rotate(item.angle * Math.PI / 180);
-                
-                // Pulsing Selection Glow
-                if (!isEx && selectedItem === item) {
-                    tCtx.shadowColor = '#8b5cf6';
-                    tCtx.shadowBlur = 15 + Math.sin(Date.now() / 200) * 5;
-                }
-
-                if (item.type === 'source') {
-                    if (item.beam < 360) {
-                        tCtx.beginPath(); tCtx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180);
-                        tCtx.arc(0, 0, 40 * ex, sA, eA); tCtx.lineTo(0, 0); tCtx.fillStyle = 'rgba(139, 92, 246, 0.2)'; tCtx.fill();
-                    }
-                    tCtx.beginPath(); tCtx.arc(0, 0, 8 * ex, 0, Math.PI * 2); tCtx.fillStyle = '#8b5cf6'; tCtx.fill();
-                    tCtx.beginPath(); tCtx.moveTo(6 * ex, 0); tCtx.lineTo(12 * ex, 0); tCtx.lineWidth = 3 * ex; tCtx.strokeStyle = 'white'; tCtx.stroke();
-                    if (!isEx && selectedItem === item) { tCtx.strokeStyle = 'white'; tCtx.lineWidth = 2; tCtx.stroke(); }
-                } else {
-                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
-                    tCtx.fillStyle = cfg.color + '22'; tCtx.fillRect(-w/2, -h/2, w, h);
-                    tCtx.strokeStyle = (!isEx && selectedItem === item) ? '#ffffff' : cfg.color; 
-                    tCtx.lineWidth = 2 * ex; tCtx.strokeRect(-w/2, -h/2, w, h);
-                    tCtx.fillStyle = 'white'; tCtx.font = `900 ${10 * ex}px Inter`; tCtx.shadowColor = 'black'; tCtx.shadowBlur = 4 * ex;
-                    tCtx.fillText(item.label, -w/2 + 5 * ex, -h/2 + 15 * ex);
-                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    tCtx.font = `bold ${10 * ex}px Inter`; tCtx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5 * ex, h/2 - 5 * ex); tCtx.shadowBlur = 0;
-                }
-                tCtx.restore();
-            });
-            if (!isEx) requestAnimationFrame(() => {}); // Maintain pulse
-        }
-
-        function downloadMap() {
-            const eW = 3000, eH = eW * (height / width), tC = document.createElement('canvas'); tC.width = eW; tC.height = eH;
-            const tCtx = tC.getContext('2d'); tCtx.fillStyle = '#030712'; tCtx.fillRect(0, 0, eW, eH);
-            render(tCtx, eW, eH, true);
-            const l = document.createElement('a'); l.download = `acoustic-site-plan-${Date.now()}.png`; l.href = tC.toDataURL('image/png'); l.click();
-        }
+        function updateMaterial(matKey) { if (!selectedItem) return; selectedItem.material = matKey; selectedItem.absorption = MATERIAL_PRESETS[matKey].abs; updateInspector(); triggerUpdate(); }
 
         function updateInspector() {
             if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-700">Select an element to edit details.</p>`; return; }
@@ -743,34 +607,75 @@
             if (isS) {
                 h += `
                     <div class="bg-black p-2 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label><input type="number" data-prop="db" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-700 text-violet-400 text-[10px] text-center rounded"></div>
-                        <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('db', this.value, 'number', 60, 130)">
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label><input type="number" data-sync="db" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <input type="range" min="60" max="130" value="${selectedItem.db}" data-sync="db" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('db', this.value, 'number', 60, 130)">
                     </div>
                     <div class="bg-black p-2 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label><input type="number" data-prop="beam" value="${selectedItem.beam}" oninput="syncInput('beam', this.value, 'slider', 30, 360)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
-                        <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('beam', this.value, 'number', 30, 360)">
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label><input type="number" data-sync="beam" value="${selectedItem.beam}" oninput="syncInput('beam', this.value, 'slider', 30, 360)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <input type="range" min="30" max="360" value="${selectedItem.beam}" data-sync="beam" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('beam', this.value, 'number', 30, 360)">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Mount Hgt (m)</label><input type="number" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Bass Bias (%)</label><input type="number" value="${selectedItem.bassBias}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.bassBias = parseFloat(this.value); render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Mount (m)</label><input type="number" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); triggerUpdate()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Bass Bias</label><input type="number" value="${selectedItem.bassBias}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.bassBias = parseFloat(this.value); triggerUpdate()"></div>
                     </div>`;
             } else {
                 h += `
-                    <div class="mb-1"><label class="block text-[9px] font-black text-gray-500 uppercase mb-1 tracking-widest">Element Label</label><input type="text" value="${selectedItem.label}" class="w-full bg-black border border-gray-800 rounded p-1.5 text-white text-[10px] font-bold" oninput="selectedItem.label = this.value; render()"></div>
+                    <div class="mb-1"><label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest">Label</label><input type="text" value="${selectedItem.label}" class="w-full bg-black border border-gray-800 rounded p-1.5 text-white text-[10px] font-bold" oninput="selectedItem.label = this.value; render()"></div>
                     <div class="grid grid-cols-3 gap-2">
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height (m)</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">W (m)</label><input type="number" data-sync="w" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="syncInput('w', this.value*scale, 'none', 1, 1000)"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">L (m)</label><input type="number" data-sync="h" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="syncInput('h', this.value*scale, 'none', 1, 1000)"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">H (m)</label><input type="number" data-sync="vHeight" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="syncInput('vHeight', this.value, 'none', 0, 20)"></div>
                     </div>
-                    <div><label class="block text-[9px] font-black text-gray-500 uppercase mb-1 tracking-widest">Material Preset</label><select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}</select></div>`;
+                    <div><label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest">Material</label><select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}</select></div>`;
             }
-            h += `<div class="bg-black p-2 rounded border border-gray-800"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label><input type="number" data-prop="angle" value="${selectedItem.angle}" oninput="syncInput('angle', this.value, 'slider', 0, 359)" class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"></div><input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('angle', this.value, 'number', 0, 359)"></div><button onclick="duplicateSelected()" class="w-full theme-gradient text-white text-[10px] font-bold uppercase py-1.5 rounded hover:brightness-110 mt-2">Duplicate Element</button></div>`;
+            h += `<div class="bg-black p-2 rounded border border-gray-800"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label><input type="number" data-sync="angle" value="${selectedItem.angle}" oninput="syncInput('angle', this.value, 'slider', 0, 359)" class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"></div><input type="range" min="0" max="359" value="${selectedItem.angle}" data-sync="angle" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('angle', this.value, 'number', 0, 359)"></div><button onclick="duplicateSelected()" class="w-full theme-gradient text-white text-[10px] font-bold uppercase py-1.5 rounded hover:brightness-110 mt-2">Duplicate</button></div>`;
             inspector.innerHTML = h;
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, width, height);
+            if (backgroundImage) { ctx.globalAlpha = mapOpacity / 100; const r = backgroundImage.width / backgroundImage.height; let dw = width, dh = width / r; if (r < width / height) { dh = height; dw = height * r; } ctx.drawImage(backgroundImage, (width - dw) / 2, (height - dh) / 2, dw, dh); ctx.globalAlpha = 1.0; }
+            if (needsHeatmapUpdate) updateHeatmapLayer();
+            ctx.drawImage(offscreenHeatmap, 0, 0);
+            
+            const sch = items.filter(i => i.type !== 'source');
+            if (sch.length > 0) {
+                const pad = 15, iH = 22, pW = 320, pH = (sch.length * iH) + 55;
+                ctx.save(); ctx.translate(width - pW - pad, pad); ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.beginPath(); ctx.roundRect(0, 0, pW, pH, 10); ctx.fill(); ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = `900 11px Inter`; ctx.fillText("SITE ACOUSTIC SCHEDULE", 15, 25);
+                sch.forEach((o, i) => {
+                    const y = 55 + (i * iH), dbV = calculateTotalDb(o.x + o.w/2, o.y + o.h/2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = `9px Inter`; ctx.fillText(o.material.toUpperCase(), 15, y); ctx.fillStyle = 'white'; ctx.font = `700 10px Inter`; ctx.fillText(o.label, 110, y); ctx.fillStyle = '#8b5cf6'; ctx.font = `900 11px Inter`; ctx.textAlign = 'right'; ctx.fillText(`${Math.round(dbV)} dB`, pW - 15, y); ctx.textAlign = 'start';
+                }); ctx.restore();
+            }
+
+            const legendW = 40, legendH = 200;
+            ctx.save(); ctx.translate(15, 15); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.roundRect(0,0, legendW, legendH + 40, 8); ctx.fill(); ctx.fillStyle = 'white'; ctx.font = `bold 8px Inter`; ctx.fillText("INTENSITY", 5, 15);
+            for(let i=0; i<=100; i+=10) { const db = 30 + i, y = legendH - (i/100 * legendH) + 25; ctx.fillStyle = INTENSITY_SCHEMES[currentScheme](db, 1); ctx.fillRect(5, y, 10, legendH/11); ctx.fillStyle = 'white'; ctx.fillText(db, 20, y + 8); }
+            ctx.restore();
+
+            const bP = 20, bW = 10 * scale, bH = 6; ctx.fillStyle = 'white'; ctx.fillRect(width - bW - bP, height - bP - bH, bW, bH); ctx.font = `bold 10px Inter`; ctx.textAlign = 'right'; ctx.fillText("10m CALIBRATION BAR", width - bP, height - bP - bH - 5); ctx.textAlign = 'start';
+
+            items.forEach(item => {
+                const cx = (item.x + (item.w ? item.w / 2 : 0)), cy = (item.y + (item.h ? item.h / 2 : 0)), w = (item.w || 0), h = (item.h || 0); ctx.save(); ctx.translate(cx, cy); ctx.rotate(item.angle * Math.PI / 180);
+                if (selectedItem === item) { ctx.shadowColor = '#8b5cf6'; ctx.shadowBlur = 15 + Math.sin(Date.now() / 200) * 5; }
+                if (item.type === 'source') {
+                    if (item.beam < 360) { ctx.beginPath(); ctx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180); ctx.arc(0, 0, 40, sA, eA); ctx.lineTo(0, 0); ctx.fillStyle = 'rgba(139, 92, 246, 0.2)'; ctx.fill(); }
+                    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fillStyle = '#8b5cf6'; ctx.fill(); ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(12, 0); ctx.lineWidth = 3; ctx.strokeStyle = 'white'; ctx.stroke();
+                } else {
+                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' }; ctx.fillStyle = cfg.color + '22'; ctx.fillRect(-w/2, -h/2, w, h); ctx.strokeStyle = (selectedItem === item) ? '#ffffff' : cfg.color; ctx.lineWidth = 2; ctx.strokeRect(-w/2, -h/2, w, h); ctx.fillStyle = 'white'; ctx.font = `900 10px Inter`; ctx.shadowColor = 'black'; ctx.shadowBlur = 4; ctx.fillText(item.label, -w/2 + 5, -h/2 + 15); const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2); ctx.font = `bold 10px Inter`; ctx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5, h/2 - 5);
+                } ctx.restore();
+            });
+        }
+
+        function downloadMap() {
+            const eW = 3000, eH = eW * (height / width), tC = document.createElement('canvas'); tC.width = eW; tC.height = eH; const tCtx = tC.getContext('2d'); tCtx.fillStyle = '#030712'; tCtx.fillRect(0, 0, eW, eH); const factor = eW / width;
+            for (let x = 0; x < eW; x += 6) { for (let y = 0; y < eH; y += 6) { const db = calculateTotalDb(x / factor, y / factor); if (db > noiseFloor + 1) { tCtx.fillStyle = INTENSITY_SCHEMES[currentScheme](db, 0.4); tCtx.fillRect(x, y, 7, 7); } } }
+            items.forEach(item => { const cx = (item.x + (item.w ? item.w / 2 : 0)) * factor, cy = (item.y + (item.h ? item.h / 2 : 0)) * factor, w = (item.w || 0) * factor, h = (item.h || 0) * factor; tCtx.save(); tCtx.translate(cx, cy); tCtx.rotate(item.angle * Math.PI / 180); if (item.type === 'source') { tCtx.beginPath(); tCtx.arc(0, 0, 15, 0, Math.PI * 2); tCtx.fillStyle = '#8b5cf6'; tCtx.fill(); } else { tCtx.strokeStyle = 'white'; tCtx.lineWidth = 4; tCtx.strokeRect(-w/2, -h/2, w, h); tCtx.fillStyle = 'white'; tCtx.font = `900 24px Inter`; tCtx.fillText(item.label, -w/2 + 10, -h/2 + 40); } tCtx.restore(); });
+            const l = document.createElement('a'); l.download = `acoustic-site-plan.png`; l.href = tC.toDataURL('image/png'); l.click();
         }
 
         function setMode(m) { mode = m; document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode)); }
         window.onload = init;
-        setInterval(render, 100); // Trigger animation loop for pulses
     </script>
 </body>
 </html>
