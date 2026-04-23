@@ -178,16 +178,6 @@
                             <option value="concrete">Concrete / Tarmac (Reflective)</option>
                         </select>
                     </div>
-
-                    <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Intensity Scheme</label>
-                        <select id="schemeSelect" onchange="updateScheme(this.value)" class="w-full bg-black border border-gray-700 rounded p-1.5 text-violet-400 text-[10px] font-bold">
-                            <option value="violet">Blue & Violet</option>
-                            <option value="thermal">Thermal</option>
-                            <option value="toxic">Toxic</option>
-                            <option value="grayscale">Grayscale</option>
-                        </select>
-                    </div>
                 </div>
             </section>
 
@@ -236,7 +226,7 @@
                         <span class="text-lg">🎸</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Stage</span>
                     </button>
                     <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="dancefloor">
-                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center text-blue-300">Dancefloor</span>
+                        <span class="text-lg">💃</span><span class="text-[8px] font-bold uppercase leading-tight text-center">Dancefloor</span>
                     </button>
                     <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="bar">
                         <span class="text-lg">🍺</span><span class="text-[8px] font-bold uppercase text-center leading-tight">Bar</span>
@@ -616,11 +606,11 @@
             if (isS) {
                 h += `
                     <div class="bg-black p-2 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase">SPL (Peak dB)</label><input type="number" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label><input type="number" data-prop="db" value="${selectedItem.db}" oninput="syncInput('db', this.value, 'slider', 60, 130)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
                         <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('db', this.value, 'number', 60, 130)">
                     </div>
                     <div class="bg-black p-2 rounded border border-gray-800">
-                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase">Dispersion (°)</label><input type="number" value="${selectedItem.beam}" oninput="syncInput('beam', this.value, 'slider', 30, 360)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
+                        <div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label><input type="number" data-prop="beam" value="${selectedItem.beam}" oninput="syncInput('beam', this.value, 'slider', 30, 360)" class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] text-center rounded"></div>
                         <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('beam', this.value, 'number', 30, 360)">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -629,15 +619,15 @@
                     </div>`;
             } else {
                 h += `
-                    <div class="mb-1"><label class="block text-[9px] font-black text-gray-500 uppercase mb-1">Element Label</label><input type="text" value="${selectedItem.label}" class="w-full bg-black border border-gray-800 rounded p-1.5 text-white text-[10px] font-bold" oninput="selectedItem.label = this.value; render()"></div>
+                    <div class="mb-1"><label class="block text-[9px] font-black text-gray-500 uppercase mb-1 tracking-widest">Element Label</label><input type="text" value="${selectedItem.label}" class="w-full bg-black border border-gray-800 rounded p-1.5 text-white text-[10px] font-bold" oninput="selectedItem.label = this.value; render()"></div>
                     <div class="grid grid-cols-3 gap-2">
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">W (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">L (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
-                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">H (m)</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height (m)</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
                     </div>
-                    <div><label class="block text-[9px] font-black text-gray-500 uppercase mb-1">Material Preset</label><select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}</select></div>`;
+                    <div><label class="block text-[9px] font-black text-gray-500 uppercase mb-1 tracking-widest">Material Preset</label><select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}</select></div>`;
             }
-            h += `<div class="bg-black p-2 rounded border border-gray-800"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label><input type="number" value="${selectedItem.angle}" oninput="syncInput('angle', this.value, 'slider', 0, 359)" class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"></div><input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('angle', this.value, 'number', 0, 359)"></div><button onclick="duplicateSelected()" class="w-full theme-gradient text-white text-[10px] font-bold uppercase py-1.5 rounded hover:brightness-110 mt-2">Duplicate Element</button></div>`;
+            h += `<div class="bg-black p-2 rounded border border-gray-800"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label><input type="number" data-prop="angle" value="${selectedItem.angle}" oninput="syncInput('angle', this.value, 'slider', 0, 359)" class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"></div><input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" class="w-full h-1 appearance-none bg-gray-800 rounded slider-accent" oninput="syncInput('angle', this.value, 'number', 0, 359)"></div><button onclick="duplicateSelected()" class="w-full theme-gradient text-white text-[10px] font-bold uppercase py-1.5 rounded hover:brightness-110 mt-2">Duplicate Element</button></div>`;
             inspector.innerHTML = h;
         }
 
