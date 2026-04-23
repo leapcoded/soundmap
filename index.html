@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Mapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #f3f4f6;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        canvas {
+            cursor: crosshair;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .control-panel {
+            scrollbar-width: thin;
+            scrollbar-color: #4b5563 #1f2937;
+        }
+        .mode-btn.active {
+            background-color: rgba(236, 72, 153, 0.2);
+            border-color: #ec4899;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold text-pink-500">Event Sound Mapper</h1>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Site Planning Tool</p>
+        </div>
+        <div class="flex gap-4 items-center">
+            <label class="bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-xs px-3 py-1 rounded border border-blue-700 transition-colors cursor-pointer">
+                Upload Site Map
+                <input type="file" id="mapUpload" class="hidden" accept="image/*">
+            </label>
+            <button id="downloadBtn" class="bg-pink-900/50 hover:bg-pink-800 text-pink-200 text-xs px-3 py-1 rounded border border-pink-700 transition-colors">
+                Download PNG
+            </button>
+            <button id="undoBtn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs px-3 py-1 rounded border border-gray-600 transition-colors">
+                Undo
+            </button>
+            <button id="clearBtn" class="bg-red-900/50 hover:bg-red-800 text-red-200 text-xs px-3 py-1 rounded border border-red-700 transition-colors">
+                Clear All
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside class="w-80 bg-gray-900 border-r border-gray-700 p-4 flex flex-col gap-6 control-panel overflow-y-auto">
+            
+            <section>
+                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">MAP SETTINGS</h2>
+                <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Pixels per Meter</label>
+                    <input type="range" id="scaleSlider" min="2" max="50" value="10" 
+                        class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        oninput="updateGlobalScale(this.value)">
+                    <div class="flex justify-between text-[10px] mt-1 text-gray-400">
+                        <span>Far</span>
+                        <span class="text-pink-400 font-bold"><span id="scaleVal">10</span> px/m</span>
+                        <span>Close</span>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">INFRASTRUCTURE</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setMode('source')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="source">
+                        <span class="text-xl">🔊</span>
+                        <span class="text-[10px] mt-1">Speaker</span>
+                    </button>
+                    <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="barrier">
+                        <span class="text-xl">🧱</span>
+                        <span class="text-[10px] mt-1">Barrier</span>
+                    </button>
+                    <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="delete">
+                        <span class="text-xl">🗑️</span>
+                        <span class="text-[10px] mt-1 text-center">Delete</span>
+                    </button>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">SITE ELEMENTS</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setMode('welfare')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="welfare">
+                        <span class="text-xl">🏠</span>
+                        <span class="text-[10px] mt-1 text-center">Welfare</span>
+                    </button>
+                    <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="campervans">
+                        <span class="text-xl">🚐</span>
+                        <span class="text-[10px] mt-1 text-center">Campervans</span>
+                    </button>
+                    <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="camping">
+                        <span class="text-xl">⛺</span>
+                        <span class="text-[10px] mt-1 text-center">Camping</span>
+                    </button>
+                    <button onclick="setMode('stage')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="stage">
+                        <span class="text-xl">🎸</span>
+                        <span class="text-[10px] mt-1 text-center">Stage</span>
+                    </button>
+                    <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="dancefloor">
+                        <span class="text-xl">💃</span>
+                        <span class="text-[10px] mt-1 text-center">Dance</span>
+                    </button>
+                    <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="bar">
+                        <span class="text-xl">🍺</span>
+                        <span class="text-[10px] mt-1 text-center">Bar</span>
+                    </button>
+                    <button onclick="setMode('chill')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="chill">
+                        <span class="text-xl">🧘</span>
+                        <span class="text-[10px] mt-1 text-center">Chill</span>
+                    </button>
+                    <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="kitchen">
+                        <span class="text-xl">🍳</span>
+                        <span class="text-[10px] mt-1 text-center">Kitchen</span>
+                    </button>
+                    <button onclick="setMode('workshops')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="workshops">
+                        <span class="text-xl">🔨</span>
+                        <span class="text-[10px] mt-1 text-center">Workshops</span>
+                    </button>
+                    <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="fire">
+                        <span class="text-xl">🔥</span>
+                        <span class="text-[10px] mt-1 text-center">Fire</span>
+                    </button>
+                    <button onclick="setMode('showers')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="showers">
+                        <span class="text-xl">🚿</span>
+                        <span class="text-[10px] mt-1 text-center">Showers</span>
+                    </button>
+                    <button onclick="setMode('toilets')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="toilets">
+                        <span class="text-xl">🚽</span>
+                        <span class="text-[10px] mt-1 text-center">Toilets</span>
+                    </button>
+                    <button onclick="setMode('seating')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="seating">
+                        <span class="text-xl">🪑</span>
+                        <span class="text-[10px] mt-1 text-center">Seating</span>
+                    </button>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">SELECTED ITEM</h2>
+                <div id="inspector" class="text-sm text-gray-400 italic">
+                    Select an item to edit.
+                </div>
+            </section>
+        </aside>
+
+        <!-- Canvas Area -->
+        <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
+            <canvas id="mapCanvas"></canvas>
+            
+            <!-- Mouse Info Overlay -->
+            <div id="mouseCoords" class="absolute bottom-4 left-4 bg-gray-900/80 backdrop-blur px-3 py-2 rounded text-[10px] font-mono border border-gray-700 pointer-events-none">
+                X: 0, Y: 0 | <span id="currentDb">-- dB</span>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const inspector = document.getElementById('inspector');
+        const mouseCoords = document.getElementById('mouseCoords');
+        const currentDbLabel = document.getElementById('currentDb');
+        const mapUpload = document.getElementById('mapUpload');
+        const scaleValDisplay = document.getElementById('scaleVal');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let width, height;
+        let scale = 10; 
+        let mode = 'source';
+        let items = [];
+        let history = [];
+        let selectedItem = null;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let backgroundImage = null;
+
+        const ATTENUATION_OFF_AXIS = 20;
+
+        const ZONE_CONFIG = {
+            welfare: { label: 'Welcome/Welfare', color: '#f87171', abs: 4, vH: 3 }, // abs is dB/meter for zones
+            campervans: { label: 'Campervans', color: '#fbbf24', abs: 1, vH: 2.5 },
+            camping: { label: 'Camping', color: '#10b981', abs: 5, vH: 2 },
+            stage: { label: 'Stage', color: '#ec4899', abs: 40, vH: 6 }, // Structures have flat attenuation
+            dancefloor: { label: 'Dancefloor', color: '#ef4444', abs: 0.1, vH: 0 },
+            bar: { label: 'Bar', color: '#f59e0b', abs: 2, vH: 4 },
+            chill: { label: 'Chill', color: '#8b5cf6', abs: 6, vH: 3 },
+            kitchen: { label: 'Kitchen', color: '#3b82f6', abs: 2, vH: 3 },
+            workshops: { label: 'Workshops', color: '#6366f1', abs: 2, vH: 3 },
+            fire: { label: 'Fire', color: '#fb7185', abs: 0, vH: 0 },
+            showers: { label: 'Showers', color: '#0ea5e9', abs: 3, vH: 2.5 },
+            toilets: { label: 'Toilets', color: '#94a3b8', abs: 3, vH: 2.5 },
+            seating: { label: 'Seating', color: '#2dd4bf', abs: 0.5, vH: 0.5 }
+        };
+
+        function saveHistory() {
+            history.push(JSON.stringify(items));
+            if (history.length > 30) history.shift();
+        }
+
+        function undo() {
+            if (history.length === 0) return;
+            items = JSON.parse(history.pop());
+            selectedItem = null;
+            updateInspector();
+            render();
+        }
+
+        function updateGlobalScale(val) {
+            scale = parseInt(val);
+            scaleValDisplay.textContent = val;
+            render();
+        }
+
+        function init() {
+            window.addEventListener('resize', resize);
+            resize();
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            document.getElementById('clearBtn').onclick = clearItems;
+            document.getElementById('undoBtn').onclick = undo;
+            downloadBtn.onclick = downloadMap;
+            mapUpload.addEventListener('change', handleMapUpload);
+            setMode('source');
+            render();
+        }
+
+        function handleMapUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => { backgroundImage = img; render(); };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resize() {
+            const container = canvas.parentElement;
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            render();
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+        }
+
+        function clearItems() {
+            saveHistory();
+            items = [];
+            selectedItem = null;
+            backgroundImage = null;
+            mapUpload.value = '';
+            updateInspector();
+            render();
+        }
+
+        function isPointInItem(px, py, item) {
+            if (item.type === 'source') return Math.hypot(item.x - px, item.y - py) < 15;
+            const cx = item.x + item.w / 2;
+            const cy = item.y + item.h / 2;
+            const angleRad = -item.angle * Math.PI / 180;
+            const dx = px - cx; const dy = py - cy;
+            const localX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+            const localY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+            return localX >= -item.w/2 && localX <= item.w/2 && localY >= -item.h/2 && localY <= item.h/2;
+        }
+
+        function handleMouseDown(e) {
+            const pos = getMousePos(e);
+            const hit = [...items].reverse().find(item => isPointInItem(pos.x, pos.y, item));
+
+            if (hit) {
+                if (mode === 'delete') {
+                    saveHistory();
+                    items = items.filter(i => i !== hit);
+                    selectedItem = null;
+                } else {
+                    saveHistory();
+                    selectedItem = hit;
+                    isDragging = true;
+                    dragOffset.x = pos.x - hit.x;
+                    dragOffset.y = pos.y - hit.y;
+                }
+                updateInspector();
+                render();
+                return;
+            }
+
+            if (mode === 'delete') return;
+
+            saveHistory();
+            const newItem = { id: Date.now(), angle: 0 };
+            if (mode === 'source') {
+                newItem.type = 'source';
+                newItem.x = pos.x; newItem.y = pos.y;
+                newItem.db = 100; newItem.beam = 90;
+            } else if (mode === 'barrier') {
+                newItem.type = 'barrier';
+                newItem.x = pos.x - 40; newItem.y = pos.y - 10;
+                newItem.w = 80; newItem.h = 20; newItem.vHeight = 4;
+                newItem.label = "Structure";
+                newItem.absorption = 50; 
+            } else if (ZONE_CONFIG[mode]) {
+                newItem.type = mode;
+                newItem.x = pos.x - 50; newItem.y = pos.y - 50;
+                newItem.w = 100; newItem.h = 100;
+                newItem.vHeight = ZONE_CONFIG[mode].vH;
+                newItem.label = ZONE_CONFIG[mode].label;
+                newItem.absorption = ZONE_CONFIG[mode].abs;
+            } else { return; }
+
+            items.push(newItem);
+            selectedItem = newItem;
+            updateInspector();
+            render();
+        }
+
+        function handleMouseMove(e) {
+            const pos = getMousePos(e);
+            mouseCoords.childNodes[0].textContent = `X: ${Math.round(pos.x/scale)}m, Y: ${Math.round(pos.y/scale)}m | `;
+            const dbAtMouse = calculateTotalDb(pos.x, pos.y);
+            currentDbLabel.textContent = `${Math.round(dbAtMouse)} dB`;
+            currentDbLabel.className = dbAtMouse > 90 ? 'text-red-500' : (dbAtMouse > 60 ? 'text-orange-400' : 'text-green-400');
+            if (isDragging && selectedItem) {
+                selectedItem.x = pos.x - dragOffset.x;
+                selectedItem.y = pos.y - dragOffset.y;
+                render();
+            }
+        }
+
+        function handleMouseUp() { isDragging = false; }
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function calculateTotalDb(x, y) {
+            let totalIntensity = 0;
+            const sources = items.filter(i => i.type === 'source');
+            const objects = items.filter(i => i.type !== 'source');
+
+            sources.forEach(source => {
+                totalIntensity += calculateIntensity(source, x, y, objects);
+                objects.forEach(obj => {
+                    // Reflected Sound (approx)
+                    if (obj.type === 'barrier' || obj.type === 'stage') {
+                        const imageSource = getMirroredPoint(source.x, source.y, obj);
+                        const distPixels = Math.hypot(imageSource.x - x, imageSource.y - y);
+                        const distMeters = Math.max(0.1, distPixels / scale);
+                        const reflectionLoss = -10 * Math.log10(1 - (Math.min(99, obj.absorption) / 100));
+                        let reflectedDb = source.db - (20 * Math.log10(distMeters)) - reflectionLoss;
+                        if (isReflectionValid(source, {x, y}, obj)) {
+                             totalIntensity += Math.pow(10, reflectedDb / 10);
+                        }
+                    }
+                });
+            });
+            return totalIntensity > 0 ? 10 * Math.log10(totalIntensity) : 0;
+        }
+
+        function calculateIntensity(source, tx, ty, objects) {
+            const distPixels = Math.hypot(source.x - tx, source.y - ty);
+            const distMeters = Math.max(0.1, distPixels / scale); 
+            let currentDb = source.db - (20 * Math.log10(distMeters));
+            
+            if (source.beam < 360) {
+                const angleToPoint = Math.atan2(ty - source.y, tx - source.x) * (180 / Math.PI);
+                let diff = Math.abs(angleToPoint - source.angle) % 360;
+                if (diff > 180) diff = 360 - diff;
+                if (diff > source.beam / 2) currentDb -= ATTENUATION_OFF_AXIS;
+            }
+            
+            objects.forEach(obj => {
+                const intersectLength = getIntersectionLength(source.x, source.y, tx, ty, obj);
+                if (intersectLength > 0) {
+                    if (obj.type === 'barrier' || obj.type === 'stage') {
+                        // Binary obstruction behavior for infrastructure
+                        // Height impacts diffraction depth (literal)
+                        const heightEffect = Math.min(20, obj.vHeight * 4);
+                        currentDb -= heightEffect;
+                    } else {
+                        // Volumetric absorption for zones (literal)
+                        // intersectLength is in pixels, convert to meters
+                        const metersInZone = intersectLength / scale;
+                        currentDb -= metersInZone * (obj.absorption / 10);
+                    }
+                }
+            });
+
+            return Math.pow(10, currentDb / 10);
+        }
+
+        // Calculates how many pixels of the ray source->target are inside the rotated rect
+        function getIntersectionLength(x1, y1, x2, y2, rect) {
+            const cx = rect.x + rect.w / 2;
+            const cy = rect.y + rect.h / 2;
+            const rad = -rect.angle * Math.PI / 180;
+            
+            const rotate = (px, py) => {
+                const dx = px - cx; const dy = py - cy;
+                return {
+                    x: dx * Math.cos(rad) - dy * Math.sin(rad),
+                    y: dx * Math.sin(rad) + dy * Math.cos(rad)
+                };
+            };
+
+            const p1 = rotate(x1, y1);
+            const p2 = rotate(x2, y2);
+            const minX = -rect.w/2, maxX = rect.w/2, minY = -rect.h/2, maxY = rect.h/2;
+
+            // Cohen-Sutherland or simple clipping to find segment inside AABB
+            let tMin = 0, tMax = 1;
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
+
+            const clip = (p, q) => {
+                if (p === 0) return q >= 0;
+                const t = q / p;
+                if (p < 0) { if (t > tMax) return false; if (t > tMin) tMin = t; }
+                else { if (t < tMin) return false; if (t < tMax) tMax = t; }
+                return true;
+            };
+
+            if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) &&
+                clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) {
+                if (tMax > tMin) {
+                    const segX = (tMax - tMin) * dx;
+                    const segY = (tMax - tMin) * dy;
+                    return Math.hypot(segX, segY);
+                }
+            }
+            return 0;
+        }
+
+        function getMirroredPoint(px, py, rect) {
+            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
+            const rad = rect.angle * Math.PI / 180;
+            const dx = px - cx; const dy = py - cy;
+            const lx = dx * Math.cos(-rad) - dy * Math.sin(-rad);
+            const ly = dx * Math.sin(-rad) + dy * Math.cos(-rad);
+            const mLy = -ly;
+            const rx = lx * Math.cos(rad) - mLy * Math.sin(rad);
+            const ry = lx * Math.sin(rad) + mLy * Math.cos(rad);
+            return { x: rx + cx, y: ry + cy };
+        }
+
+        function isReflectionValid(source, target, rect) {
+            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
+            const rad = rect.angle * Math.PI / 180;
+            const toLocal = (p) => {
+                const dx = p.x - cx; const dy = p.y - cy;
+                return { x: dx * Math.cos(-rad) - dy * Math.sin(-rad), y: dx * Math.sin(-rad) + dy * Math.cos(-rad) };
+            };
+            const lS = toLocal(source); const lT = toLocal(target);
+            if ((lS.y > 0 && lT.y > 0) || (lS.y < 0 && lT.y < 0)) {
+                const t = Math.abs(lS.y) / (Math.abs(lS.y) + Math.abs(lT.y));
+                const hitX = lS.x + t * (lT.x - lS.x);
+                return hitX >= -rect.w/2 && hitX <= rect.w/2;
+            }
+            return false;
+        }
+
+        function updateInspector() {
+            if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-500">Select an item to edit.</p>`; return; }
+            const isSource = selectedItem.type === 'source';
+            let html = `<div class="space-y-4">`;
+            if (isSource) {
+                html += `
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Power (dB)</label>
+                        <input type="range" min="60" max="130" value="${selectedItem.db}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.db = parseInt(this.value); render(); document.getElementById('dbVal').textContent = this.value">
+                        <div class="flex justify-between text-[10px] mt-1 text-pink-400"><span>60dB</span><span id="dbVal">${selectedItem.db}</span><span>130dB</span></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Beam Width</label>
+                        <input type="range" min="30" max="360" value="${selectedItem.beam}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.beam = parseInt(this.value); render();">
+                    </div>`;
+            } else {
+                html += `
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Label</label>
+                        <input type="text" value="${selectedItem.label}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.label = this.value; render()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Vertical Height (m)</label>
+                        <input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.vHeight = parseFloat(this.value); render()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">${selectedItem.type === 'barrier' || selectedItem.type === 'stage' ? 'Reflection Loss' : 'Absorption (dB/m)'}</label>
+                        <input type="range" min="0" max="100" value="${selectedItem.absorption}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.absorption = parseInt(this.value); render(); document.getElementById('absVal').textContent = this.value">
+                        <div class="flex justify-between text-[10px] mt-1 text-pink-400"><span>Min</span><span id="absVal">${selectedItem.absorption}</span><span>Max</span></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Width (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.w = parseInt(this.value)*scale; render()"></div>
+                        <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Length (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.h = parseInt(this.value)*scale; render()"></div>
+                    </div>`;
+            }
+            html += `<div><label class="block text-xs font-bold text-gray-500 uppercase">Rotation</label><input type="range" min="0" max="359" value="${selectedItem.angle}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.angle = parseInt(this.value); render(); document.getElementById('angleVal').textContent = this.value">
+                    <div class="flex justify-between text-[10px] mt-1 text-gray-400"><span>0°</span><span class="text-pink-400 font-bold"><span id="angleVal">${selectedItem.angle}</span>°</span><span>359°</span></div></div></div>`;
+            inspector.innerHTML = html;
+        }
+
+        function render(targetCtx = ctx, targetWidth = width, targetHeight = height, isExport = false) {
+            targetCtx.clearRect(0, 0, targetWidth, targetHeight);
+            
+            if (backgroundImage) {
+                const imgRatio = backgroundImage.width / backgroundImage.height;
+                const canvasRatio = targetWidth / targetHeight;
+                let dw, dh;
+                if (imgRatio > canvasRatio) { dw = targetWidth; dh = targetWidth / imgRatio; }
+                else { dh = targetHeight; dw = targetHeight * imgRatio; }
+                targetCtx.globalAlpha = 0.5;
+                targetCtx.drawImage(backgroundImage, (targetWidth - dw) / 2, (targetHeight - dh) / 2, dw, dh);
+                targetCtx.globalAlpha = 1.0;
+            }
+
+            const step = isExport ? 4 : 8; 
+            const exportScaleFactor = targetWidth / width;
+            
+            for (let x = 0; x < targetWidth; x += step) {
+                for (let y = 0; y < targetHeight; y += step) {
+                    const db = calculateTotalDb(x / exportScaleFactor, y / exportScaleFactor);
+                    if (db > 40) {
+                        const alpha = Math.min(0.4, (db - 40) / 100);
+                        let color = db > 90 ? `rgba(239, 68, 68, ${alpha})` : 
+                                   db > 75 ? `rgba(249, 115, 22, ${alpha})` : 
+                                   db > 60 ? `rgba(234, 179, 8, ${alpha})` : `rgba(34, 197, 94, ${alpha})`;
+                        targetCtx.fillStyle = color;
+                        targetCtx.fillRect(x, y, step, step);
+                    }
+                }
+            }
+
+            items.forEach(item => {
+                const cx = (item.x + (item.w ? item.w / 2 : 0)) * exportScaleFactor;
+                const cy = (item.y + (item.h ? item.h / 2 : 0)) * exportScaleFactor;
+                const w = (item.w || 0) * exportScaleFactor;
+                const h = (item.h || 0) * exportScaleFactor;
+                
+                targetCtx.save();
+                targetCtx.translate(cx, cy);
+                targetCtx.rotate(item.angle * Math.PI / 180);
+                
+                if (item.type === 'source') {
+                    if (item.beam < 360) {
+                        targetCtx.beginPath(); targetCtx.moveTo(0, 0);
+                        const start = (-item.beam / 2) * (Math.PI / 180); const end = (item.beam / 2) * (Math.PI / 180);
+                        targetCtx.arc(0, 0, 40 * exportScaleFactor, start, end); targetCtx.lineTo(0, 0);
+                        targetCtx.fillStyle = 'rgba(236, 72, 153, 0.2)'; targetCtx.fill();
+                    }
+                    targetCtx.beginPath(); targetCtx.arc(0, 0, 10 * exportScaleFactor, 0, Math.PI * 2);
+                    targetCtx.fillStyle = '#ec4899'; targetCtx.fill();
+                    targetCtx.beginPath(); targetCtx.moveTo(8 * exportScaleFactor, 0); targetCtx.lineTo(15 * exportScaleFactor, 0); targetCtx.lineWidth = 3 * exportScaleFactor; targetCtx.strokeStyle = 'white'; targetCtx.stroke();
+                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${10 * exportScaleFactor}px sans-serif`; targetCtx.textAlign = 'center';
+                    targetCtx.fillText(`${item.db}dB`, 0, -15 * exportScaleFactor);
+                } else if (item.type === 'barrier' || item.type === 'stage') {
+                    targetCtx.fillStyle = '#4b5563'; targetCtx.fillRect(-w/2, -h/2, w, h);
+                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#ec4899' : '#9ca3af'; 
+                    targetCtx.lineWidth = 1 * exportScaleFactor;
+                    targetCtx.strokeRect(-w/2, -h/2, w, h);
+                    targetCtx.fillStyle = 'white'; targetCtx.font = `${10 * exportScaleFactor}px sans-serif`; targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 13 * exportScaleFactor);
+                } else {
+                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
+                    targetCtx.strokeStyle = cfg.color; targetCtx.lineWidth = 2 * exportScaleFactor; targetCtx.setLineDash([5 * exportScaleFactor, 5 * exportScaleFactor]);
+                    targetCtx.strokeRect(-w/2, -h/2, w, h); targetCtx.setLineDash([]);
+                    targetCtx.fillStyle = cfg.color + '22'; targetCtx.fillRect(-w/2, -h/2, w, h);
+                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${10 * exportScaleFactor}px sans-serif`;
+                    targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 15 * exportScaleFactor);
+                    const dbVal = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
+                    targetCtx.fillText(`Avg: ${Math.round(dbVal)}dB`, -w/2 + 5 * exportScaleFactor, h/2 - 5 * exportScaleFactor);
+                }
+                targetCtx.restore();
+            });
+        }
+
+        function downloadMap() {
+            const exportWidth = 3000;
+            const aspectRatio = height / width;
+            const exportHeight = exportWidth * aspectRatio;
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = exportWidth; tempCanvas.height = exportHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.fillStyle = '#111827'; tempCtx.fillRect(0, 0, exportWidth, exportHeight);
+            render(tempCtx, exportWidth, exportHeight, true);
+            const link = document.createElement('a');
+            link.download = `infurno-sound-map-${Date.now()}.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
