@@ -198,9 +198,13 @@
                         <span class="text-xl">🔊</span>
                         <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Speaker</span>
                     </button>
-                    <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="barrier">
-                        <span class="text-xl">🧱</span>
-                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Barrier</span>
+                    <button onclick="setMode('hay_bales')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="hay_bales">
+                        <span class="text-xl">🌾</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight">Hay Bales</span>
+                    </button>
+                    <button onclick="setMode('heras_panel')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="heras_panel">
+                        <span class="text-xl">🚧</span>
+                        <span class="text-[9px] font-bold uppercase opacity-70 text-center leading-tight text-[7px]">Heras (3.5m)</span>
                     </button>
                     <button onclick="setMode('ruler')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="ruler">
                         <span class="text-xl">📏</span>
@@ -275,7 +279,6 @@
 
         <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
             <canvas id="mapCanvas"></canvas>
-            
             <div id="mouseCoords" class="absolute bottom-6 left-6 bg-black/90 backdrop-blur-md px-4 py-3 rounded-lg text-[11px] font-bold border border-gray-800 pointer-events-none shadow-2xl flex gap-6">
                 <div class="text-gray-500 uppercase tracking-tight">Pos: <span class="text-white ml-1 font-mono" id="xyDisplay">0, 0</span>m</div>
                 <div class="text-gray-500 uppercase tracking-tight border-l border-gray-800 pl-6">Intensity: <span id="currentDb" class="text-white ml-1 font-mono">-- dB</span></div>
@@ -320,12 +323,13 @@
         const MATERIAL_PRESETS = {
             open: { label: "Air / Open Space", abs: 1, blocking: 0.05, type: 'vol' },
             stretch: { label: "Stretch Tent (Open sides)", abs: 60, blocking: 0, type: 'canopy' },
+            hay: { label: "Hay Bales (Damping)", abs: 80, blocking: 0.5, type: 'shell' },
             fabric: { label: "Fabric / Canvas (Closed)", abs: 70, blocking: 0.35, type: 'shell' },
             padded: { label: "Padded / Soft Goods", abs: 90, blocking: 0.6, type: 'vol' },
             wood: { label: "Wood / Structure", abs: 40, blocking: 0.55, type: 'shell' },
             metal: { label: "Metal / Solid Barrier", abs: 10, blocking: 0.85, type: 'shell' },
             concrete: { label: "Concrete / Massive", abs: 5, blocking: 0.95, type: 'shell' },
-            heras: { label: "Metal Mesh / Heras", abs: 15, blocking: 0.1, type: 'shell' },
+            acoustic_heras: { label: "Acoustic Heras (Covered)", abs: 85, blocking: 0.8, type: 'shell' },
             plastic: { label: "Plastic / PVC Shell", abs: 50, blocking: 0.45, type: 'shell' },
             foliage: { label: "Dense Foliage / Hedge", abs: 65, blocking: 0.25, type: 'vol' },
             human: { label: "Crowd / People", abs: 60, blocking: 0.4, type: 'vol' }
@@ -345,7 +349,9 @@
             firepit: { label: 'Firepit', color: '#fb7185', material: 'open', vH: 0 },
             showers: { label: 'Showers', color: '#0ea5e9', material: 'plastic', vH: 2.5 },
             toilets: { label: 'Toilets', color: '#94a3b8', material: 'plastic', vH: 2.5 },
-            seating: { label: 'Seating', color: '#4ade80', material: 'wood', vH: 0.5 }
+            seating: { label: 'Seating', color: '#4ade80', material: 'wood', vH: 0.5 },
+            heras_panel: { label: 'Heras Panel (3.5m)', color: '#6d28d9', material: 'acoustic_heras', vH: 2 },
+            hay_bales: { label: 'Hay Bales', color: '#facc15', material: 'hay', vH: 1.5 }
         };
 
         const INTENSITY_SCHEMES = {
@@ -433,7 +439,8 @@
             const data = { items, scale, mapOpacity, noiseFloor, groundFactor, windSpeed, windDir, currentScheme };
             const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `acoustic-planner-${Date.now()}.json`; a.click();
+            const a = document.createElement('a'); a.href = url;
+            a.download = `acoustic-planner-${Date.now()}.json`; a.click();
         }
 
         function loadProject(e) {
@@ -496,8 +503,18 @@
             history.push(JSON.stringify(items));
             const newItem = { id: Date.now(), angle: 0 };
             if (mode === 'source') { newItem.type = 'source'; newItem.x = pos.x; newItem.y = pos.y; newItem.db = 100; newItem.beam = 90; newItem.bassBias = 50; newItem.vHeight = 4; }
+            else if (mode === 'heras_panel') { 
+                const cfg = ZONE_CONFIG[mode]; newItem.type = 'heras_panel'; 
+                newItem.x = pos.x - (3.5 * scale / 2); newItem.y = pos.y - 2;
+                newItem.w = 3.5 * scale; newItem.h = 4 * scale; newItem.vHeight = cfg.vH; 
+                newItem.label = "Heras Panel (3.5m)"; newItem.material = cfg.material; newItem.absorption = MATERIAL_PRESETS[cfg.material].abs; 
+            }
+            else if (mode === 'hay_bales') {
+                const cfg = ZONE_CONFIG[mode]; newItem.type = 'hay_bales';
+                newItem.x = pos.x - 20; newItem.y = pos.y - 10; newItem.w = 40; newItem.h = 20;
+                newItem.vHeight = cfg.vH; newItem.label = "Hay Bales"; newItem.material = cfg.material; newItem.absorption = MATERIAL_PRESETS[cfg.material].abs;
+            }
             else if (ZONE_CONFIG[mode]) { const cfg = ZONE_CONFIG[mode]; newItem.type = mode; newItem.x = pos.x - 50; newItem.y = pos.y - 50; newItem.w = 100; newItem.h = 100; newItem.vHeight = cfg.vH; newItem.label = cfg.label; newItem.material = cfg.material; newItem.absorption = MATERIAL_PRESETS[cfg.material].abs; }
-            else if (mode === 'barrier') { newItem.type = 'barrier'; newItem.x = pos.x - 40; newItem.y = pos.y - 10; newItem.w = 80; newItem.h = 20; newItem.vHeight = 4; newItem.label = "Barrier"; newItem.material = 'wood'; newItem.absorption = 40; }
             items.push(newItem); selectedItem = newItem; updateInspector(); triggerUpdate();
         }
 
@@ -520,7 +537,7 @@
                 let intensity = calculateIntensity(s, x, y, objs); total += intensity;
                 objs.forEach(o => {
                     const m = MATERIAL_PRESETS[o.material];
-                    if (m.type !== 'vol' && m.blocking > 0.1) {
+                    if (m.type !== 'vol' && m.blocking > 0.3) {
                         const imgS = getMirroredPoint(s.x, s.y, o);
                         const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / scale);
                         const loss = -10 * Math.log10(1 - (Math.min(99, o.absorption) / 100));
@@ -634,6 +651,8 @@
 
         function render() {
             ctx.clearRect(0, 0, width, height);
+            const ex = width / 800; // Ref base scale for fonts
+            
             if (backgroundImage) { ctx.globalAlpha = mapOpacity / 100; const r = backgroundImage.width / backgroundImage.height; let dw = width, dh = width / r; if (r < width / height) { dh = height; dw = height * r; } ctx.drawImage(backgroundImage, (width - dw) / 2, (height - dh) / 2, dw, dh); ctx.globalAlpha = 1.0; }
             if (needsHeatmapUpdate) updateHeatmapLayer();
             ctx.drawImage(offscreenHeatmap, 0, 0);
@@ -662,7 +681,30 @@
                     if (item.beam < 360) { ctx.beginPath(); ctx.moveTo(0, 0); const sA = (-item.beam / 2) * (Math.PI / 180), eA = (item.beam / 2) * (Math.PI / 180); ctx.arc(0, 0, 40, sA, eA); ctx.lineTo(0, 0); ctx.fillStyle = 'rgba(139, 92, 246, 0.2)'; ctx.fill(); }
                     ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fillStyle = '#8b5cf6'; ctx.fill(); ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(12, 0); ctx.lineWidth = 3; ctx.strokeStyle = 'white'; ctx.stroke();
                 } else {
-                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' }; ctx.fillStyle = cfg.color + '22'; ctx.fillRect(-w/2, -h/2, w, h); ctx.strokeStyle = (selectedItem === item) ? '#ffffff' : cfg.color; ctx.lineWidth = 2; ctx.strokeRect(-w/2, -h/2, w, h); ctx.fillStyle = 'white'; ctx.font = `900 10px Inter`; ctx.shadowColor = 'black'; ctx.shadowBlur = 4; ctx.fillText(item.label, -w/2 + 5, -h/2 + 15); const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2); ctx.font = `bold 10px Inter`; ctx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5, h/2 - 5);
+                    const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
+                    ctx.fillStyle = cfg.color + '22'; ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.strokeStyle = (selectedItem === item) ? '#ffffff' : cfg.color; 
+                    ctx.lineWidth = 2; ctx.strokeRect(-w/2, -h/2, w, h);
+                    
+                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
+                    ctx.fillStyle = 'white';
+                    ctx.font = `900 10px Inter`;
+                    ctx.shadowColor = 'black';
+                    ctx.shadowBlur = 6;
+                    
+                    // Smart Text Positioning for small objects
+                    if (h > 25) {
+                        // Position labels inside for larger elements
+                        ctx.fillText(item.label, -w/2 + 5, -h/2 + 15);
+                        ctx.font = `bold 10px Inter`;
+                        ctx.fillText(`${Math.round(dbV)}dB`, -w/2 + 5, h/2 - 5);
+                    } else {
+                        // Position labels outside for small/narrow elements
+                        ctx.textAlign = 'center';
+                        ctx.fillText(item.label, 0, -h/2 - 5);
+                        ctx.font = `bold 10px Inter`;
+                        ctx.fillText(`${Math.round(dbV)}dB`, 0, h/2 + 12);
+                    }
                 } ctx.restore();
             });
         }
