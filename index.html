@@ -3,166 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sound Mapper</title>
+    <title>Acoustic Site Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            background-color: #111827;
-            color: #f3f4f6;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        :root {
+            --accent-violet: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --ui-bg: #030712;
         }
+
+        body {
+            background-color: var(--ui-bg);
+            color: #f3f4f6;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        }
+
         canvas {
             cursor: crosshair;
             background-image: 
-                linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+                linear-gradient(to right, rgba(139, 92, 246, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
             background-size: 20px 20px;
         }
+
+        .theme-gradient {
+            background: linear-gradient(135deg, var(--accent-violet) 0%, var(--accent-blue) 100%);
+        }
+
         .control-panel {
             scrollbar-width: thin;
-            scrollbar-color: #4b5563 #1f2937;
+            scrollbar-color: #374151 var(--ui-bg);
         }
+
+        .mode-btn {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mode-btn:hover {
+            border-color: var(--accent-violet);
+            background-color: #1f2937;
+        }
+
         .mode-btn.active {
-            background-color: rgba(236, 72, 153, 0.2);
-            border-color: #ec4899;
+            background-color: rgba(139, 92, 246, 0.15);
+            border-color: var(--accent-violet);
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+        }
+
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .slider-accent {
+            accent-color: var(--accent-violet);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b5cf6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1rem;
         }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center">
-        <div>
-            <h1 class="text-xl font-bold text-pink-500">Event Sound Mapper</h1>
-            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Site Planning Tool</p>
+    <header class="bg-black border-b border-gray-800 p-4 flex justify-between items-center relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5 pointer-events-none theme-gradient"></div>
+        <div class="relative z-10">
+            <h1 class="text-xl font-black uppercase tracking-tight text-white">
+                Acoustic <span class="text-violet-500">Site Planner</span>
+            </h1>
         </div>
-        <div class="flex gap-4 items-center">
-            <label class="bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-xs px-3 py-1 rounded border border-blue-700 transition-colors cursor-pointer">
-                Upload Site Map
+        
+        <div class="flex gap-2 items-center relative z-10">
+            <label class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded cursor-pointer transition-colors border border-gray-700">
+                Upload Map
                 <input type="file" id="mapUpload" class="hidden" accept="image/*">
             </label>
-            <button id="downloadBtn" class="bg-pink-900/50 hover:bg-pink-800 text-pink-200 text-xs px-3 py-1 rounded border border-pink-700 transition-colors">
-                Download PNG
+            <button id="downloadBtn" class="theme-gradient text-white text-[10px] font-black uppercase px-3 py-1.5 rounded shadow-lg hover:brightness-110 transition-all">
+                Export PNG
             </button>
-            <button id="undoBtn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs px-3 py-1 rounded border border-gray-600 transition-colors">
+            <button id="undoBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded transition-colors border border-gray-700">
                 Undo
             </button>
-            <button id="clearBtn" class="bg-red-900/50 hover:bg-red-800 text-red-200 text-xs px-3 py-1 rounded border border-red-700 transition-colors">
-                Clear All
+            <button id="clearBtn" class="bg-indigo-950/40 hover:bg-indigo-900 text-indigo-300 text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-indigo-900/50 transition-colors">
+                Reset
             </button>
         </div>
     </header>
 
     <main class="flex-1 flex overflow-hidden">
-        <!-- Sidebar Controls -->
-        <aside class="w-80 bg-gray-900 border-r border-gray-700 p-4 flex flex-col gap-6 control-panel overflow-y-auto">
+        <!-- Sidebar -->
+        <aside class="w-80 bg-black border-r border-gray-800 p-4 flex flex-col gap-6 control-panel overflow-y-auto">
             
             <section>
-                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">MAP SETTINGS</h2>
-                <div class="bg-gray-800/50 p-3 rounded border border-gray-700">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Pixels per Meter</label>
-                    <input type="range" id="scaleSlider" min="2" max="50" value="10" 
-                        class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                        oninput="updateGlobalScale(this.value)">
-                    <div class="flex justify-between text-[10px] mt-1 text-gray-400">
-                        <span>Far</span>
-                        <span class="text-pink-400 font-bold"><span id="scaleVal">10</span> px/m</span>
-                        <span>Close</span>
+                <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Global Settings
+                </h2>
+                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-800/50">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Scale (Pixels/m)</label>
+                        <input type="number" id="scaleInput" min="2" max="50" value="10" 
+                            class="w-12 bg-black border border-gray-700 text-blue-400 text-[10px] font-bold text-center rounded py-0.5"
+                            oninput="updateGlobalScale(this.value, 'slider')">
                     </div>
+                    <input type="range" id="scaleSlider" min="2" max="50" value="10" 
+                        class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-accent"
+                        oninput="updateGlobalScale(this.value, 'input')">
                 </div>
             </section>
 
             <section>
-                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">INFRASTRUCTURE</h2>
+                <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span> Tools
+                </h2>
                 <div class="grid grid-cols-3 gap-2">
-                    <button onclick="setMode('source')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="source">
+                    <button onclick="setMode('source')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="source">
                         <span class="text-xl">🔊</span>
-                        <span class="text-[10px] mt-1">Speaker</span>
+                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Speaker</span>
                     </button>
-                    <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="barrier">
+                    <button onclick="setMode('barrier')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="barrier">
                         <span class="text-xl">🧱</span>
-                        <span class="text-[10px] mt-1">Barrier</span>
+                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Barrier</span>
                     </button>
-                    <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="delete">
-                        <span class="text-xl">🗑️</span>
-                        <span class="text-[10px] mt-1 text-center">Delete</span>
+                    <button onclick="setMode('delete')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg aspect-square" data-mode="delete">
+                        <span class="text-xl text-blue-400">🗑️</span>
+                        <span class="text-[9px] mt-1 font-bold uppercase opacity-70">Delete</span>
                     </button>
                 </div>
             </section>
 
             <section>
-                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">SITE ELEMENTS</h2>
+                <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Elements
+                </h2>
                 <div class="grid grid-cols-3 gap-2">
-                    <button onclick="setMode('welfare')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="welfare">
-                        <span class="text-xl">🏠</span>
-                        <span class="text-[10px] mt-1 text-center">Welfare</span>
+                    <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="camping">
+                        <span class="text-lg">⛺</span><span class="text-[8px] mt-1 font-bold uppercase">Camping</span>
                     </button>
-                    <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="campervans">
-                        <span class="text-xl">🚐</span>
-                        <span class="text-[10px] mt-1 text-center">Campervans</span>
+                    <button onclick="setMode('campervans')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="campervans">
+                        <span class="text-lg">🚐</span><span class="text-[8px] mt-1 font-bold uppercase">Caravans</span>
                     </button>
-                    <button onclick="setMode('camping')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="camping">
-                        <span class="text-xl">⛺</span>
-                        <span class="text-[10px] mt-1 text-center">Camping</span>
+                    <button onclick="setMode('registration')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="registration">
+                        <span class="text-lg">📝</span><span class="text-[8px] mt-1 font-bold uppercase text-center leading-tight">Registration</span>
                     </button>
-                    <button onclick="setMode('stage')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="stage">
-                        <span class="text-xl">🎸</span>
-                        <span class="text-[10px] mt-1 text-center">Stage</span>
+                    <button onclick="setMode('welfare')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="welfare">
+                        <span class="text-lg">🏠</span><span class="text-[8px] mt-1 font-bold uppercase">Welfare</span>
                     </button>
-                    <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="dancefloor">
-                        <span class="text-xl">💃</span>
-                        <span class="text-[10px] mt-1 text-center">Dance</span>
+                    <button onclick="setMode('stage')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="stage">
+                        <span class="text-lg">🎸</span><span class="text-[8px] mt-1 font-bold uppercase">Stage</span>
                     </button>
-                    <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="bar">
-                        <span class="text-xl">🍺</span>
-                        <span class="text-[10px] mt-1 text-center">Bar</span>
+                    <button onclick="setMode('dancefloor')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="dancefloor">
+                        <span class="text-lg">💃</span><span class="text-[8px] mt-1 font-bold uppercase">Dance</span>
                     </button>
-                    <button onclick="setMode('chill')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="chill">
-                        <span class="text-xl">🧘</span>
-                        <span class="text-[10px] mt-1 text-center">Chill</span>
+                    <button onclick="setMode('bar')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="bar">
+                        <span class="text-lg">🍺</span><span class="text-[8px] mt-1 font-bold uppercase">Bar</span>
                     </button>
-                    <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="kitchen">
-                        <span class="text-xl">🍳</span>
-                        <span class="text-[10px] mt-1 text-center">Kitchen</span>
+                    <button onclick="setMode('chill')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="chill">
+                        <span class="text-lg">🧘</span><span class="text-[8px] mt-1 font-bold uppercase">Chillout</span>
                     </button>
-                    <button onclick="setMode('workshops')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="workshops">
-                        <span class="text-xl">🔨</span>
-                        <span class="text-[10px] mt-1 text-center">Workshops</span>
+                    <button onclick="setMode('kitchen')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="kitchen">
+                        <span class="text-lg">🍳</span><span class="text-[8px] mt-1 font-bold uppercase">Kitchen</span>
                     </button>
-                    <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="fire">
-                        <span class="text-xl">🔥</span>
-                        <span class="text-[10px] mt-1 text-center">Fire</span>
+                    <button onclick="setMode('workshops')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="workshops">
+                        <span class="text-lg">🔨</span><span class="text-[8px] mt-1 font-bold uppercase">Workshops</span>
                     </button>
-                    <button onclick="setMode('showers')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="showers">
-                        <span class="text-xl">🚿</span>
-                        <span class="text-[10px] mt-1 text-center">Showers</span>
+                    <button onclick="setMode('fire')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="fire">
+                        <span class="text-lg">🔥</span><span class="text-[8px] mt-1 font-bold uppercase">Firepit</span>
                     </button>
-                    <button onclick="setMode('toilets')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="toilets">
-                        <span class="text-xl">🚽</span>
-                        <span class="text-[10px] mt-1 text-center">Toilets</span>
+                    <button onclick="setMode('showers')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="showers">
+                        <span class="text-lg">🚿</span><span class="text-[8px] mt-1 font-bold uppercase">Showers</span>
                     </button>
-                    <button onclick="setMode('seating')" class="mode-btn flex flex-col items-center justify-center p-2 rounded border border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all" data-mode="seating">
-                        <span class="text-xl">🪑</span>
-                        <span class="text-[10px] mt-1 text-center">Seating</span>
+                    <button onclick="setMode('toilets')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="toilets">
+                        <span class="text-lg">🚽</span><span class="text-[8px] mt-1 font-bold uppercase opacity-60">Toilets</span>
+                    </button>
+                    <button onclick="setMode('seating')" class="mode-btn flex flex-col items-center justify-center p-2 rounded-lg" data-mode="seating">
+                        <span class="text-lg">🪑</span><span class="text-[8px] mt-1 font-bold uppercase">Seating</span>
                     </button>
                 </div>
             </section>
 
-            <section>
-                <h2 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-800 pb-1">SELECTED ITEM</h2>
-                <div id="inspector" class="text-sm text-gray-400 italic">
-                    Select an item to edit.
+            <section class="mt-auto">
+                <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white"></span> Inspector
+                </h2>
+                <div id="inspector" class="text-[10px] text-gray-500 bg-gray-950 p-4 rounded-lg border border-gray-900 min-h-[120px]">
+                    Select an element to view literal acoustic properties.
                 </div>
             </section>
         </aside>
 
-        <!-- Canvas Area -->
+        <!-- Map Area -->
         <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center">
             <canvas id="mapCanvas"></canvas>
             
-            <!-- Mouse Info Overlay -->
-            <div id="mouseCoords" class="absolute bottom-4 left-4 bg-gray-900/80 backdrop-blur px-3 py-2 rounded text-[10px] font-mono border border-gray-700 pointer-events-none">
-                X: 0, Y: 0 | <span id="currentDb">-- dB</span>
+            <!-- Mouse Telemetry -->
+            <div id="mouseCoords" class="absolute bottom-6 left-6 bg-black/90 backdrop-blur-md px-4 py-2.5 rounded-lg text-[10px] font-black border border-gray-800 pointer-events-none shadow-2xl flex gap-4">
+                <div class="text-gray-500 uppercase tracking-tighter">Position: <span class="text-white" id="xyDisplay">0, 0</span>m</div>
+                <div class="text-gray-500 uppercase tracking-tighter border-l border-gray-800 pl-4">Intensity: <span id="currentDb" class="text-violet-400 font-bold">-- dB</span></div>
             </div>
         </div>
     </main>
@@ -171,10 +219,11 @@
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
         const inspector = document.getElementById('inspector');
-        const mouseCoords = document.getElementById('mouseCoords');
+        const xyDisplay = document.getElementById('xyDisplay');
         const currentDbLabel = document.getElementById('currentDb');
         const mapUpload = document.getElementById('mapUpload');
-        const scaleValDisplay = document.getElementById('scaleVal');
+        const scaleSlider = document.getElementById('scaleSlider');
+        const scaleInput = document.getElementById('scaleInput');
         const downloadBtn = document.getElementById('downloadBtn');
 
         let width, height;
@@ -189,20 +238,31 @@
 
         const ATTENUATION_OFF_AXIS = 20;
 
+        const MATERIAL_PRESETS = {
+            open: { label: "Air / Open Space", abs: 1 },
+            fabric: { label: "Fabric / Canvas", abs: 70 },
+            padded: { label: "Padded / Soft Goods", abs: 90 },
+            wood: { label: "Wood / Structures", abs: 40 },
+            metal: { label: "Metal / Vehicles", abs: 10 },
+            concrete: { label: "Concrete / Solid", abs: 5 },
+            human: { label: "Crowd / People", abs: 60 }
+        };
+
         const ZONE_CONFIG = {
-            welfare: { label: 'Welcome/Welfare', color: '#f87171', abs: 4, vH: 3 }, // abs is dB/meter for zones
-            campervans: { label: 'Campervans', color: '#fbbf24', abs: 1, vH: 2.5 },
-            camping: { label: 'Camping', color: '#10b981', abs: 5, vH: 2 },
-            stage: { label: 'Stage', color: '#ec4899', abs: 40, vH: 6 }, // Structures have flat attenuation
-            dancefloor: { label: 'Dancefloor', color: '#ef4444', abs: 0.1, vH: 0 },
-            bar: { label: 'Bar', color: '#f59e0b', abs: 2, vH: 4 },
-            chill: { label: 'Chill', color: '#8b5cf6', abs: 6, vH: 3 },
-            kitchen: { label: 'Kitchen', color: '#3b82f6', abs: 2, vH: 3 },
-            workshops: { label: 'Workshops', color: '#6366f1', abs: 2, vH: 3 },
-            fire: { label: 'Fire', color: '#fb7185', abs: 0, vH: 0 },
-            showers: { label: 'Showers', color: '#0ea5e9', abs: 3, vH: 2.5 },
-            toilets: { label: 'Toilets', color: '#94a3b8', abs: 3, vH: 2.5 },
-            seating: { label: 'Seating', color: '#2dd4bf', abs: 0.5, vH: 0.5 }
+            camping: { label: 'Camping', color: '#10b981', material: 'fabric', vH: 2 },
+            campervans: { label: 'Caravans', color: '#fbbf24', material: 'metal', vH: 2.5 },
+            registration: { label: 'Registration / Welcome', color: '#6366f1', material: 'wood', vH: 2.5 },
+            welfare: { label: 'Welfare', color: '#f87171', material: 'fabric', vH: 3 },
+            stage: { label: 'Stage', color: '#8b5cf6', material: 'wood', vH: 6 },
+            dancefloor: { label: 'Dancefloor', color: '#3b82f6', material: 'human', vH: 0 },
+            bar: { label: 'Bar', color: '#f59e0b', material: 'wood', vH: 3 },
+            chill: { label: 'Chillout', color: '#a855f7', material: 'padded', vH: 3 },
+            kitchen: { label: 'Kitchen', color: '#3b82f6', material: 'wood', vH: 3 },
+            workshops: { label: 'Workshops', color: '#2dd4bf', material: 'wood', vH: 3 },
+            fire: { label: 'Firepit', color: '#fb7185', material: 'open', vH: 0 },
+            showers: { label: 'Showers', color: '#0ea5e9', material: 'metal', vH: 2.5 },
+            toilets: { label: 'Toilets', color: '#94a3b8', material: 'metal', vH: 2.5 },
+            seating: { label: 'Seating', color: '#4ade80', material: 'wood', vH: 0.5 }
         };
 
         function saveHistory() {
@@ -218,9 +278,10 @@
             render();
         }
 
-        function updateGlobalScale(val) {
-            scale = parseInt(val);
-            scaleValDisplay.textContent = val;
+        function updateGlobalScale(val, syncId) {
+            scale = parseInt(val) || 10;
+            if (syncId === 'input') scaleInput.value = val;
+            if (syncId === 'slider') scaleSlider.value = val;
             render();
         }
 
@@ -270,9 +331,6 @@
             saveHistory();
             items = [];
             selectedItem = null;
-            backgroundImage = null;
-            mapUpload.value = '';
-            updateInspector();
             render();
         }
 
@@ -315,20 +373,25 @@
             if (mode === 'source') {
                 newItem.type = 'source';
                 newItem.x = pos.x; newItem.y = pos.y;
-                newItem.db = 100; newItem.beam = 90;
+                newItem.db = 100;
+                newItem.beam = 90;
+                newItem.bassBias = 50;
             } else if (mode === 'barrier') {
                 newItem.type = 'barrier';
                 newItem.x = pos.x - 40; newItem.y = pos.y - 10;
                 newItem.w = 80; newItem.h = 20; newItem.vHeight = 4;
-                newItem.label = "Structure";
-                newItem.absorption = 50; 
+                newItem.label = "Barrier";
+                newItem.material = 'wood';
+                newItem.absorption = MATERIAL_PRESETS.wood.abs;
             } else if (ZONE_CONFIG[mode]) {
+                const cfg = ZONE_CONFIG[mode];
                 newItem.type = mode;
                 newItem.x = pos.x - 50; newItem.y = pos.y - 50;
                 newItem.w = 100; newItem.h = 100;
-                newItem.vHeight = ZONE_CONFIG[mode].vH;
-                newItem.label = ZONE_CONFIG[mode].label;
-                newItem.absorption = ZONE_CONFIG[mode].abs;
+                newItem.vHeight = cfg.vH;
+                newItem.label = cfg.label;
+                newItem.material = cfg.material;
+                newItem.absorption = MATERIAL_PRESETS[cfg.material].abs;
             } else { return; }
 
             items.push(newItem);
@@ -339,10 +402,10 @@
 
         function handleMouseMove(e) {
             const pos = getMousePos(e);
-            mouseCoords.childNodes[0].textContent = `X: ${Math.round(pos.x/scale)}m, Y: ${Math.round(pos.y/scale)}m | `;
+            xyDisplay.textContent = `${Math.round(pos.x/scale)}, ${Math.round(pos.y/scale)}`;
             const dbAtMouse = calculateTotalDb(pos.x, pos.y);
             currentDbLabel.textContent = `${Math.round(dbAtMouse)} dB`;
-            currentDbLabel.className = dbAtMouse > 90 ? 'text-red-500' : (dbAtMouse > 60 ? 'text-orange-400' : 'text-green-400');
+            currentDbLabel.className = dbAtMouse > 90 ? 'text-violet-400' : (dbAtMouse > 60 ? 'text-blue-400' : 'text-indigo-400');
             if (isDragging && selectedItem) {
                 selectedItem.x = pos.x - dragOffset.x;
                 selectedItem.y = pos.y - dragOffset.y;
@@ -361,20 +424,17 @@
             let totalIntensity = 0;
             const sources = items.filter(i => i.type === 'source');
             const objects = items.filter(i => i.type !== 'source');
-
             sources.forEach(source => {
                 totalIntensity += calculateIntensity(source, x, y, objects);
                 objects.forEach(obj => {
-                    // Reflected Sound (approx)
-                    if (obj.type === 'barrier' || obj.type === 'stage') {
+                    if (obj.material !== 'open') {
                         const imageSource = getMirroredPoint(source.x, source.y, obj);
                         const distPixels = Math.hypot(imageSource.x - x, imageSource.y - y);
                         const distMeters = Math.max(0.1, distPixels / scale);
-                        const reflectionLoss = -10 * Math.log10(1 - (Math.min(99, obj.absorption) / 100));
-                        let reflectedDb = source.db - (20 * Math.log10(distMeters)) - reflectionLoss;
-                        if (isReflectionValid(source, {x, y}, obj)) {
-                             totalIntensity += Math.pow(10, reflectedDb / 10);
-                        }
+                        const reflectionEfficiency = 1 - (source.bassBias / 150); 
+                        const baseReflectionLoss = -10 * Math.log10(1 - (Math.min(99, obj.absorption) / 100));
+                        let reflectedDb = source.db - (20 * Math.log10(distMeters)) - (baseReflectionLoss / reflectionEfficiency);
+                        if (isReflectionValid(source, {x, y}, obj)) { totalIntensity += Math.pow(10, reflectedDb / 10); }
                     }
                 });
             });
@@ -385,56 +445,34 @@
             const distPixels = Math.hypot(source.x - tx, source.y - ty);
             const distMeters = Math.max(0.1, distPixels / scale); 
             let currentDb = source.db - (20 * Math.log10(distMeters));
-            
             if (source.beam < 360) {
                 const angleToPoint = Math.atan2(ty - source.y, tx - source.x) * (180 / Math.PI);
                 let diff = Math.abs(angleToPoint - source.angle) % 360;
                 if (diff > 180) diff = 360 - diff;
                 if (diff > source.beam / 2) currentDb -= ATTENUATION_OFF_AXIS;
             }
-            
             objects.forEach(obj => {
                 const intersectLength = getIntersectionLength(source.x, source.y, tx, ty, obj);
                 if (intersectLength > 0) {
-                    if (obj.type === 'barrier' || obj.type === 'stage') {
-                        // Binary obstruction behavior for infrastructure
-                        // Height impacts diffraction depth (literal)
-                        const heightEffect = Math.min(20, obj.vHeight * 4);
-                        currentDb -= heightEffect;
-                    } else {
-                        // Volumetric absorption for zones (literal)
-                        // intersectLength is in pixels, convert to meters
-                        const metersInZone = intersectLength / scale;
-                        currentDb -= metersInZone * (obj.absorption / 10);
-                    }
+                    const bassPassThrough = 1 - (source.bassBias / 120); 
+                    if (obj.vHeight > 0.5) { currentDb -= Math.min(20, obj.vHeight * 4) * bassPassThrough; }
+                    else { currentDb -= ((intersectLength / scale) * (obj.absorption / 10)) * bassPassThrough; }
                 }
             });
-
             return Math.pow(10, currentDb / 10);
         }
 
-        // Calculates how many pixels of the ray source->target are inside the rotated rect
         function getIntersectionLength(x1, y1, x2, y2, rect) {
-            const cx = rect.x + rect.w / 2;
-            const cy = rect.y + rect.h / 2;
+            const cx = rect.x + rect.w / 2; const cy = rect.y + rect.h / 2;
             const rad = -rect.angle * Math.PI / 180;
-            
             const rotate = (px, py) => {
                 const dx = px - cx; const dy = py - cy;
-                return {
-                    x: dx * Math.cos(rad) - dy * Math.sin(rad),
-                    y: dx * Math.sin(rad) + dy * Math.cos(rad)
-                };
+                return { x: dx * Math.cos(rad) - dy * Math.sin(rad), y: dx * Math.sin(rad) + dy * Math.cos(rad) };
             };
-
-            const p1 = rotate(x1, y1);
-            const p2 = rotate(x2, y2);
+            const p1 = rotate(x1, y1); const p2 = rotate(x2, y2);
             const minX = -rect.w/2, maxX = rect.w/2, minY = -rect.h/2, maxY = rect.h/2;
-
-            // Cohen-Sutherland or simple clipping to find segment inside AABB
             let tMin = 0, tMax = 1;
             const dx = p2.x - p1.x, dy = p2.y - p1.y;
-
             const clip = (p, q) => {
                 if (p === 0) return q >= 0;
                 const t = q / p;
@@ -442,14 +480,8 @@
                 else { if (t < tMin) return false; if (t < tMax) tMax = t; }
                 return true;
             };
-
-            if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) &&
-                clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) {
-                if (tMax > tMin) {
-                    const segX = (tMax - tMin) * dx;
-                    const segY = (tMax - tMin) * dy;
-                    return Math.hypot(segX, segY);
-                }
+            if (clip(-dx, p1.x - minX) && clip(dx, maxX - p1.x) && clip(-dy, p1.y - minY) && clip(dy, maxY - p1.y)) {
+                if (tMax > tMin) return Math.hypot((tMax - tMin) * dx, (tMax - tMin) * dy);
             }
             return 0;
         }
@@ -482,130 +514,157 @@
             return false;
         }
 
+        function syncInput(property, value, type, min, max) {
+            let val = parseFloat(value);
+            if (isNaN(val)) return;
+            val = Math.max(min, Math.min(max, val));
+            selectedItem[property] = val;
+            const container = document.getElementById('inspector');
+            const slider = container.querySelector(`input[type=range][data-prop="${property}"]`);
+            const number = container.querySelector(`input[type=number][data-prop="${property}"]`);
+            if (type === 'slider' && slider) slider.value = val;
+            if (type === 'number' && number) number.value = val;
+            render();
+        }
+
+        function updateMaterial(matKey) {
+            selectedItem.material = matKey;
+            selectedItem.absorption = MATERIAL_PRESETS[matKey].abs;
+            updateInspector();
+            render();
+        }
+
         function updateInspector() {
-            if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-500">Select an item to edit.</p>`; return; }
+            if (!selectedItem) { inspector.innerHTML = `<p class="italic text-gray-700">Select an item to edit details.</p>`; return; }
             const isSource = selectedItem.type === 'source';
             let html = `<div class="space-y-4">`;
+            
             if (isSource) {
                 html += `
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase">Power (dB)</label>
-                        <input type="range" min="60" max="130" value="${selectedItem.db}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.db = parseInt(this.value); render(); document.getElementById('dbVal').textContent = this.value">
-                        <div class="flex justify-between text-[10px] mt-1 text-pink-400"><span>60dB</span><span id="dbVal">${selectedItem.db}</span><span>130dB</span></div>
+                    <div class="bg-black p-3 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">SPL (Peak dB)</label>
+                            <input type="number" value="${selectedItem.db}" data-prop="db" min="60" max="130"
+                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded"
+                                oninput="syncInput('db', this.value, 'slider', 60, 130)">
+                        </div>
+                        <input type="range" min="60" max="130" value="${selectedItem.db}" data-prop="db" 
+                            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
+                            oninput="syncInput('db', this.value, 'number', 60, 130)">
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase">Beam Width</label>
-                        <input type="range" min="30" max="360" value="${selectedItem.beam}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.beam = parseInt(this.value); render();">
+                    <div class="bg-black p-3 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Dispersion (°)</label>
+                            <input type="number" value="${selectedItem.beam}" data-prop="beam" min="30" max="360"
+                                class="w-10 bg-gray-900 border border-gray-800 text-violet-400 text-[10px] font-bold text-center rounded"
+                                oninput="syncInput('beam', this.value, 'slider', 30, 360)">
+                        </div>
+                        <input type="range" min="30" max="360" value="${selectedItem.beam}" data-prop="beam" 
+                            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
+                            oninput="syncInput('beam', this.value, 'number', 30, 360)">
                     </div>`;
             } else {
                 html += `
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase">Label</label>
-                        <input type="text" value="${selectedItem.label}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.label = this.value; render()">
+                    <div class="mb-2">
+                        <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Label</label>
+                        <input type="text" value="${selectedItem.label}" 
+                            class="w-full bg-black border border-gray-800 rounded p-2 text-white text-[10px] font-bold" 
+                            oninput="selectedItem.label = this.value; render()">
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Width</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.w = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Length</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.h = parseFloat(this.value)*scale; render()"></div>
+                        <div><label class="block text-[8px] font-bold text-gray-600 uppercase">Height</label><input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-black border border-gray-800 rounded p-1 text-white text-[10px]" oninput="selectedItem.vHeight = parseFloat(this.value); render()"></div>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase">Vertical Height (m)</label>
-                        <input type="number" step="0.5" value="${selectedItem.vHeight}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.vHeight = parseFloat(this.value); render()">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase">${selectedItem.type === 'barrier' || selectedItem.type === 'stage' ? 'Reflection Loss' : 'Absorption (dB/m)'}</label>
-                        <input type="range" min="0" max="100" value="${selectedItem.absorption}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.absorption = parseInt(this.value); render(); document.getElementById('absVal').textContent = this.value">
-                        <div class="flex justify-between text-[10px] mt-1 text-pink-400"><span>Min</span><span id="absVal">${selectedItem.absorption}</span><span>Max</span></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Width (m)</label><input type="number" value="${Math.round(selectedItem.w/scale)}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.w = parseInt(this.value)*scale; render()"></div>
-                        <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Length (m)</label><input type="number" value="${Math.round(selectedItem.h/scale)}" class="w-full bg-gray-800 border border-gray-700 rounded p-1 mt-1 text-white" oninput="selectedItem.h = parseInt(this.value)*scale; render()"></div>
+                        <label class="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Material Preset</label>
+                        <select onchange="updateMaterial(this.value)" class="w-full bg-black border border-gray-800 rounded p-1.5 text-blue-400 text-[10px] font-bold">
+                            ${Object.keys(MATERIAL_PRESETS).map(k => `<option value="${k}" ${selectedItem.material === k ? 'selected' : ''}>${MATERIAL_PRESETS[k].label}</option>`).join('')}
+                        </select>
                     </div>`;
             }
-            html += `<div><label class="block text-xs font-bold text-gray-500 uppercase">Rotation</label><input type="range" min="0" max="359" value="${selectedItem.angle}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" oninput="selectedItem.angle = parseInt(this.value); render(); document.getElementById('angleVal').textContent = this.value">
-                    <div class="flex justify-between text-[10px] mt-1 text-gray-400"><span>0°</span><span class="text-pink-400 font-bold"><span id="angleVal">${selectedItem.angle}</span>°</span><span>359°</span></div></div></div>`;
+            html += `
+                <div class="bg-black p-3 rounded border border-gray-800">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Rotation (°)</label>
+                        <input type="number" value="${selectedItem.angle}" data-prop="angle" min="0" max="359"
+                            class="w-10 bg-gray-900 border border-gray-800 text-blue-400 text-[10px] font-bold text-center rounded"
+                            oninput="syncInput('angle', this.value, 'slider', 0, 359)">
+                    </div>
+                    <input type="range" min="0" max="359" value="${selectedItem.angle}" data-prop="angle" 
+                        class="w-full h-1.5 rounded-lg appearance-none cursor-pointer slider-accent bg-gray-800"
+                        oninput="syncInput('angle', this.value, 'number', 0, 359)">
+                </div>
+            </div>`;
             inspector.innerHTML = html;
         }
 
         function render(targetCtx = ctx, targetWidth = width, targetHeight = height, isExport = false) {
             targetCtx.clearRect(0, 0, targetWidth, targetHeight);
-            
             if (backgroundImage) {
                 const imgRatio = backgroundImage.width / backgroundImage.height;
                 const canvasRatio = targetWidth / targetHeight;
                 let dw, dh;
                 if (imgRatio > canvasRatio) { dw = targetWidth; dh = targetWidth / imgRatio; }
                 else { dh = targetHeight; dw = targetHeight * imgRatio; }
-                targetCtx.globalAlpha = 0.5;
+                targetCtx.globalAlpha = 0.4;
                 targetCtx.drawImage(backgroundImage, (targetWidth - dw) / 2, (targetHeight - dh) / 2, dw, dh);
                 targetCtx.globalAlpha = 1.0;
             }
-
             const step = isExport ? 4 : 8; 
             const exportScaleFactor = targetWidth / width;
-            
             for (let x = 0; x < targetWidth; x += step) {
                 for (let y = 0; y < targetHeight; y += step) {
                     const db = calculateTotalDb(x / exportScaleFactor, y / exportScaleFactor);
                     if (db > 40) {
-                        const alpha = Math.min(0.4, (db - 40) / 100);
-                        let color = db > 90 ? `rgba(239, 68, 68, ${alpha})` : 
-                                   db > 75 ? `rgba(249, 115, 22, ${alpha})` : 
-                                   db > 60 ? `rgba(234, 179, 8, ${alpha})` : `rgba(34, 197, 94, ${alpha})`;
-                        targetCtx.fillStyle = color;
-                        targetCtx.fillRect(x, y, step, step);
+                        const alpha = Math.min(0.3, (db - 40) / 100);
+                        let color = db > 90 ? `rgba(139, 92, 246, ${alpha + 0.2})` : 
+                                   db > 75 ? `rgba(79, 70, 229, ${alpha + 0.1})` : 
+                                   db > 60 ? `rgba(37, 99, 235, ${alpha})` : `rgba(30, 58, 138, ${alpha})`;
+                        targetCtx.fillStyle = color; targetCtx.fillRect(x, y, step, step);
                     }
                 }
             }
-
             items.forEach(item => {
                 const cx = (item.x + (item.w ? item.w / 2 : 0)) * exportScaleFactor;
                 const cy = (item.y + (item.h ? item.h / 2 : 0)) * exportScaleFactor;
-                const w = (item.w || 0) * exportScaleFactor;
-                const h = (item.h || 0) * exportScaleFactor;
-                
-                targetCtx.save();
-                targetCtx.translate(cx, cy);
-                targetCtx.rotate(item.angle * Math.PI / 180);
-                
+                const w = (item.w || 0) * exportScaleFactor; const h = (item.h || 0) * exportScaleFactor;
+                targetCtx.save(); targetCtx.translate(cx, cy); targetCtx.rotate(item.angle * Math.PI / 180);
                 if (item.type === 'source') {
                     if (item.beam < 360) {
                         targetCtx.beginPath(); targetCtx.moveTo(0, 0);
                         const start = (-item.beam / 2) * (Math.PI / 180); const end = (item.beam / 2) * (Math.PI / 180);
                         targetCtx.arc(0, 0, 40 * exportScaleFactor, start, end); targetCtx.lineTo(0, 0);
-                        targetCtx.fillStyle = 'rgba(236, 72, 153, 0.2)'; targetCtx.fill();
+                        targetCtx.fillStyle = 'rgba(139, 92, 246, 0.15)'; targetCtx.fill();
+                        targetCtx.strokeStyle = 'rgba(139, 92, 246, 0.4)'; targetCtx.lineWidth = 1; targetCtx.stroke();
                     }
-                    targetCtx.beginPath(); targetCtx.arc(0, 0, 10 * exportScaleFactor, 0, Math.PI * 2);
-                    targetCtx.fillStyle = '#ec4899'; targetCtx.fill();
-                    targetCtx.beginPath(); targetCtx.moveTo(8 * exportScaleFactor, 0); targetCtx.lineTo(15 * exportScaleFactor, 0); targetCtx.lineWidth = 3 * exportScaleFactor; targetCtx.strokeStyle = 'white'; targetCtx.stroke();
-                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${10 * exportScaleFactor}px sans-serif`; targetCtx.textAlign = 'center';
-                    targetCtx.fillText(`${item.db}dB`, 0, -15 * exportScaleFactor);
-                } else if (item.type === 'barrier' || item.type === 'stage') {
-                    targetCtx.fillStyle = '#4b5563'; targetCtx.fillRect(-w/2, -h/2, w, h);
-                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#ec4899' : '#9ca3af'; 
-                    targetCtx.lineWidth = 1 * exportScaleFactor;
-                    targetCtx.strokeRect(-w/2, -h/2, w, h);
-                    targetCtx.fillStyle = 'white'; targetCtx.font = `${10 * exportScaleFactor}px sans-serif`; targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 13 * exportScaleFactor);
+                    targetCtx.beginPath(); targetCtx.arc(0, 0, 8 * exportScaleFactor, 0, Math.PI * 2);
+                    targetCtx.fillStyle = '#8b5cf6'; targetCtx.fill();
+                    targetCtx.beginPath(); targetCtx.moveTo(6 * exportScaleFactor, 0); targetCtx.lineTo(12 * exportScaleFactor, 0); targetCtx.lineWidth = 3 * exportScaleFactor; targetCtx.strokeStyle = 'white'; targetCtx.stroke();
+                    if (!isExport && selectedItem === item) { targetCtx.strokeStyle = 'white'; targetCtx.lineWidth = 2; targetCtx.stroke(); }
                 } else {
                     const cfg = ZONE_CONFIG[item.type] || { color: '#6b7280' };
-                    targetCtx.strokeStyle = cfg.color; targetCtx.lineWidth = 2 * exportScaleFactor; targetCtx.setLineDash([5 * exportScaleFactor, 5 * exportScaleFactor]);
-                    targetCtx.strokeRect(-w/2, -h/2, w, h); targetCtx.setLineDash([]);
                     targetCtx.fillStyle = cfg.color + '22'; targetCtx.fillRect(-w/2, -h/2, w, h);
-                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${10 * exportScaleFactor}px sans-serif`;
-                    targetCtx.fillText(item.label, -w/2 + 5 * exportScaleFactor, -h/2 + 15 * exportScaleFactor);
+                    targetCtx.strokeStyle = (!isExport && selectedItem === item) ? '#8b5cf6' : cfg.color; 
+                    targetCtx.lineWidth = 1.5 * exportScaleFactor; targetCtx.strokeRect(-w/2, -h/2, w, h);
+                    targetCtx.fillStyle = 'white'; targetCtx.font = `bold ${8 * exportScaleFactor}px sans-serif`;
+                    targetCtx.fillText(item.label, -w/2 + 4 * exportScaleFactor, -h/2 + 12 * exportScaleFactor);
                     const dbVal = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    targetCtx.fillText(`Avg: ${Math.round(dbVal)}dB`, -w/2 + 5 * exportScaleFactor, h/2 - 5 * exportScaleFactor);
+                    targetCtx.fillStyle = '#8b5cf6'; targetCtx.fillText(`${Math.round(dbVal)}dB`, -w/2 + 4 * exportScaleFactor, h/2 - 4 * exportScaleFactor);
                 }
                 targetCtx.restore();
             });
         }
 
         function downloadMap() {
-            const exportWidth = 3000;
-            const aspectRatio = height / width;
-            const exportHeight = exportWidth * aspectRatio;
+            const exportWidth = 3000; const aspectRatio = height / width; const exportHeight = exportWidth * aspectRatio;
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = exportWidth; tempCanvas.height = exportHeight;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#111827'; tempCtx.fillRect(0, 0, exportWidth, exportHeight);
+            tempCtx.fillStyle = '#030712'; tempCtx.fillRect(0, 0, exportWidth, exportHeight);
             render(tempCtx, exportWidth, exportHeight, true);
             const link = document.createElement('a');
-            link.download = `infurno-sound-map-${Date.now()}.png`;
+            link.download = `site-acoustic-map-${Date.now()}.png`;
             link.href = tempCanvas.toDataURL('image/png');
             link.click();
         }
