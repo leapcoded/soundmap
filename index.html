@@ -335,6 +335,45 @@
             margin-left: 6px;
         }
 
+        /* ─── Help modal ───────────────────────────────────────────────── */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(2px);
+            display: none;
+        }
+        .modal-overlay.open { display: flex; justify-content: flex-end; }
+        .modal-panel {
+            width: 420px; height: 100%;
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            overflow-y: auto; scrollbar-width: thin;
+            scrollbar-color: var(--border-strong) transparent;
+            display: flex; flex-direction: column;
+        }
+        .modal-panel::-webkit-scrollbar { width: 6px; }
+        .modal-panel::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+        .help-sec { padding: 20px; border-bottom: 1px solid var(--border); }
+        .help-sec:last-child { border-bottom: none; }
+        .help-h2 {
+            font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+        }
+        .help-p { font-size: 12px; line-height: 1.65; color: var(--text-2); margin-bottom: 8px; }
+        .help-p:last-child { margin-bottom: 0; }
+        .help-p strong { color: var(--text-1); font-weight: 600; }
+        .help-kv {
+            display: grid; grid-template-columns: auto 1fr;
+            gap: 6px 12px; align-items: start;
+        }
+        .help-key {
+            font-family: var(--font-mono); font-size: 11px;
+            color: var(--text-1); background: var(--surface-2);
+            border: 1px solid var(--border); border-radius: 3px;
+            padding: 2px 6px; white-space: nowrap;
+        }
+        .help-val { font-size: 12px; color: var(--text-2); line-height: 1.5; padding-top: 2px; }
+
         /* ─── Layout utilities (replaces Tailwind CDN) ─────────────────── */
         .flex           { display: flex; }
         .flex-col       { flex-direction: column; }
@@ -417,6 +456,9 @@
             <button id="themeBtn" class="btn btn-ghost btn-icon" title="Toggle theme">
                 <svg id="themeIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
             </button>
+            <button id="helpBtn" class="btn btn-ghost btn-icon" title="How to use">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
             <button id="downloadBtn" class="btn btn-primary" title="Export PNG">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export
@@ -428,6 +470,16 @@
         <!-- ═══ Sidebar ═══════════════════════════════════════════════════ -->
         <aside class="w-[280px] hairline-r shrink-0 flex flex-col overflow-hidden" style="background: var(--surface);">
             <div class="scroll overflow-y-auto p-4 flex flex-col gap-6 flex-1">
+
+                <!-- Event Details -->
+                <section class="flex flex-col gap-3">
+                    <h2 class="section-label">Event</h2>
+                    <input type="text" id="eventName" placeholder="Festival / event name" class="input" style="font-family:var(--font-ui)">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="eventDate" placeholder="Date" class="input" style="font-family:var(--font-ui)">
+                        <input type="text" id="eventLocation" placeholder="Location" class="input" style="font-family:var(--font-ui)">
+                    </div>
+                </section>
 
                 <!-- Global Settings -->
                 <section class="flex flex-col gap-3">
@@ -734,7 +786,10 @@
             windSpeed: 0,
             windDir: 0,
             scheme: 'violet',
-            band: 'broadband'
+            band: 'broadband',
+            eventName: '',
+            eventDate: '',
+            eventLocation: ''
         },
         ui: {
             mode: 'source',
@@ -1868,7 +1923,10 @@
                     windSpeed: parsed.windSpeed ?? 0,
                     windDir: parsed.windDir ?? 0,
                     scheme: parsed.scheme ?? parsed.currentScheme ?? 'violet',
-                    band:   parsed.band   ?? 'broadband'
+                    band:   parsed.band   ?? 'broadband',
+                    eventName:     parsed.eventName     ?? '',
+                    eventDate:     parsed.eventDate     ?? '',
+                    eventLocation: parsed.eventLocation ?? ''
                 };
                 state.ui.selectedId = null;
                 syncGlobalInputs();
@@ -1886,52 +1944,219 @@
 
     function exportPNG() {
         const { width, height } = state.ui;
-        const eW = EXPORT_WIDTH, eH = eW * (height / width);
-        const tC = document.createElement('canvas');
-        tC.width = eW; tC.height = eH;
-        const tCtx = tC.getContext('2d');
-        tCtx.fillStyle = cssVar('--bg');
-        tCtx.fillRect(0, 0, eW, eH);
-        const factor = eW / width;
-        const scheme = INTENSITY_SCHEMES[state.doc.scheme];
-        const floor = state.doc.noiseFloor;
+        const zones   = state.doc.items.filter(i => i.type !== 'source');
+        const eW      = EXPORT_WIDTH;
+        const factor  = eW / width;
+        const mapH    = Math.round(eW * (height / width));
 
+        // Layout heights
+        const hH      = 110;                                       // event header band
+        const tRowH   = 38;
+        const tHeadH  = 44;
+        const tPad    = 24;
+        const tH      = zones.length ? (tHeadH + zones.length * tRowH + tPad) : 0;
+        const totalH  = hH + mapH + tH;
+
+        const tC   = document.createElement('canvas');
+        tC.width   = eW; tC.height = totalH;
+        const tCtx = tC.getContext('2d');
+
+        // Pull live CSS colour values
+        const bg   = cssVar('--bg');
+        const surf = cssVar('--surface');
+        const bord = cssVar('--border');
+        const t1   = cssVar('--text-1');
+        const t2   = cssVar('--text-2');
+        const t3   = cssVar('--text-3');
+        const acc  = canvasColors.accent;
+        const pad  = 48;
+
+        // ── HEADER BAND ──────────────────────────────────────────────────
+        tCtx.fillStyle = surf;
+        tCtx.fillRect(0, 0, eW, hH);
+        tCtx.fillStyle = acc;
+        tCtx.fillRect(0, hH - 2, eW, 2);  // accent underline
+
+        tCtx.textBaseline = 'middle';
+
+        // Event name (left, large)
+        tCtx.fillStyle = t1;
+        tCtx.font = '600 48px Inter, sans-serif';
+        tCtx.fillText(state.doc.eventName || 'Acoustic Site Plan', pad, hH * 0.36);
+
+        // "Acoustic Site Plan" sub-label (only when name is set)
+        if (state.doc.eventName) {
+            tCtx.fillStyle = t2;
+            tCtx.font = '400 26px Inter, sans-serif';
+            tCtx.fillText('Acoustic Site Plan', pad, hH * 0.70);
+        }
+
+        // Date · Location (right)
+        const meta = [state.doc.eventDate, state.doc.eventLocation].filter(Boolean).join('  ·  ');
+        tCtx.textAlign = 'right';
+        if (meta) {
+            tCtx.fillStyle = t1;
+            tCtx.font = '500 26px Inter, sans-serif';
+            tCtx.fillText(meta, eW - pad, hH * 0.36);
+        }
+        // Generated timestamp
+        tCtx.fillStyle = t3;
+        tCtx.font = '400 20px Inter, sans-serif';
+        tCtx.fillText(
+            `Generated ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+            eW - pad, hH * 0.70
+        );
+        tCtx.textAlign = 'start';
+        tCtx.textBaseline = 'alphabetic';
+
+        // ── MAP AREA ─────────────────────────────────────────────────────
+        tCtx.fillStyle = bg;
+        tCtx.fillRect(0, hH, eW, mapH);
+
+        // Background map image
+        if (state.ui.backgroundImage) {
+            const img = state.ui.backgroundImage;
+            const r   = img.width / img.height;
+            let dw = eW, dh = eW / r;
+            if (r < eW / mapH) { dh = mapH; dw = mapH * r; }
+            tCtx.globalAlpha = state.doc.mapOpacity / 100;
+            tCtx.drawImage(img, (eW - dw) / 2, hH + (mapH - dh) / 2, dw, dh);
+            tCtx.globalAlpha = 1.0;
+        }
+
+        // Heatmap
+        const scheme = INTENSITY_SCHEMES[state.doc.scheme];
+        const floor  = state.doc.noiseFloor;
         for (let x = 0; x < eW; x += EXPORT_HEATMAP_STEP) {
-            for (let y = 0; y < eH; y += EXPORT_HEATMAP_STEP) {
+            for (let y = 0; y < mapH; y += EXPORT_HEATMAP_STEP) {
                 const db = calculateTotalDb(x / factor, y / factor);
                 if (db > floor + 1) {
                     tCtx.fillStyle = scheme(db, 0.4);
-                    tCtx.fillRect(x, y, EXPORT_HEATMAP_STEP + 1, EXPORT_HEATMAP_STEP + 1);
+                    tCtx.fillRect(x, hH + y, EXPORT_HEATMAP_STEP + 1, EXPORT_HEATMAP_STEP + 1);
                 }
             }
         }
 
+        // Items
         for (const item of state.doc.items) {
             const cx = (item.x + (item.w ? item.w / 2 : 0)) * factor;
-            const cy = (item.y + (item.h ? item.h / 2 : 0)) * factor;
-            const w = (item.w || 0) * factor, h = (item.h || 0) * factor;
+            const cy = hH + (item.y + (item.h ? item.h / 2 : 0)) * factor;
+            const w  = (item.w || 0) * factor, h = (item.h || 0) * factor;
             tCtx.save();
             tCtx.translate(cx, cy);
             tCtx.rotate(item.angle * Math.PI / 180);
             if (item.type === 'source') {
                 tCtx.beginPath();
                 tCtx.arc(0, 0, 15, 0, Math.PI * 2);
-                tCtx.fillStyle = canvasColors.accent;
+                tCtx.fillStyle = acc;
                 tCtx.fill();
+                tCtx.beginPath();
+                tCtx.moveTo(10, 0); tCtx.lineTo(22, 0);
+                tCtx.strokeStyle = bg; tCtx.lineWidth = 4; tCtx.stroke();
             } else {
-                const cfg = ZONE_CONFIG[item.type] || { color: canvasColors.text2 };
+                const cfg = ZONE_CONFIG[item.type] || { color: t2 };
                 tCtx.strokeStyle = cfg.color;
-                tCtx.lineWidth = 3;
+                tCtx.lineWidth = 4;
                 tCtx.strokeRect(-w/2, -h/2, w, h);
-                tCtx.fillStyle = canvasColors.text1;
-                tCtx.font = '500 22px Inter';
-                tCtx.fillText(item.label, -w/2 + 10, -h/2 + 32);
+                tCtx.fillStyle = t1;
+                tCtx.font = '500 24px Inter, sans-serif';
+                tCtx.fillText(item.label, -w/2 + 12, -h/2 + 36);
             }
             tCtx.restore();
         }
 
+        // ── SPL TABLE ────────────────────────────────────────────────────
+        if (zones.length) {
+            const tY = hH + mapH;
+            tCtx.fillStyle = surf;
+            tCtx.fillRect(0, tY, eW, tH);
+            tCtx.fillStyle = acc;
+            tCtx.fillRect(0, tY, eW, 3);  // accent top border
+
+            // Column x positions
+            const cDot  = pad;
+            const cName = pad + 44;
+            const cMat  = cName + 680;
+            const cH    = eW - 860;
+            const cAbs  = eW - 660;
+            const cRefl = eW - 460;
+            const cSpl  = eW - pad;   // right-aligned
+
+            // Header row
+            tCtx.fillStyle = t3;
+            tCtx.font = '600 19px Inter, sans-serif';
+            tCtx.textBaseline = 'middle';
+            const thY = tY + tHeadH / 2;
+            [['ZONE', cName], ['MATERIAL', cMat], ['H (m)', cH], ['ABSORB', cAbs], ['REFLECT', cRefl]].forEach(([txt, x]) => {
+                tCtx.fillText(txt, x, thY);
+            });
+            tCtx.textAlign = 'right';
+            tCtx.fillText('EST. SPL', cSpl, thY);
+            tCtx.textAlign = 'start';
+
+            // Header divider
+            tCtx.fillStyle = bord;
+            tCtx.fillRect(pad, tY + tHeadH - 1, eW - pad * 2, 1);
+
+            // Zone rows
+            zones.forEach((o, i) => {
+                const ry        = tY + tHeadH + i * tRowH + tRowH / 2;
+                const isCanopy  = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+                const dbV       = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                const cfg       = ZONE_CONFIG[o.type] || {};
+
+                // Alternating row tint
+                if (i % 2 === 0) {
+                    tCtx.fillStyle = bg;
+                    tCtx.fillRect(0, tY + tHeadH + i * tRowH, eW, tRowH);
+                }
+
+                // Colour dot
+                tCtx.beginPath();
+                tCtx.arc(cDot + 10, ry, 9, 0, Math.PI * 2);
+                tCtx.fillStyle = cfg.color || t3;
+                tCtx.fill();
+
+                tCtx.textBaseline = 'middle';
+
+                // Label
+                tCtx.fillStyle = t1;
+                tCtx.font = '500 22px Inter, sans-serif';
+                tCtx.fillText(o.label, cName, ry);
+
+                // Material
+                tCtx.fillStyle = isCanopy ? t3 : t2;
+                tCtx.font = '400 20px Inter, sans-serif';
+                tCtx.fillText(isCanopy ? 'pass-through' : o.material, cMat, ry);
+
+                // Numeric columns
+                tCtx.fillStyle = t2;
+                tCtx.font = '400 20px "JetBrains Mono", monospace';
+                tCtx.fillText(`${o.vHeight}`, cH, ry);
+                tCtx.fillText(`${o.absorption}`, cAbs, ry);
+                tCtx.fillText(`${o.reflection ?? '—'}`, cRefl, ry);
+
+                // SPL (right-aligned)
+                tCtx.textAlign = 'right';
+                if (isCanopy) {
+                    tCtx.fillStyle = t3;
+                    tCtx.font = '400 20px "JetBrains Mono", monospace';
+                    tCtx.fillText('—', cSpl, ry);
+                } else {
+                    tCtx.fillStyle = dbV > 85 ? acc : t1;
+                    tCtx.font = '600 24px "JetBrains Mono", monospace';
+                    tCtx.fillText(`${Math.round(dbV)} dB`, cSpl, ry);
+                }
+                tCtx.textAlign = 'start';
+            });
+
+            tCtx.textBaseline = 'alphabetic';
+        }
+
+        const safeName = (state.doc.eventName || 'acoustic-site-plan')
+            .replace(/[^a-z0-9]+/gi, '-').toLowerCase();
         const a = document.createElement('a');
-        a.download = 'acoustic-site-plan.png';
+        a.download = `${safeName}.png`;
         a.href = tC.toDataURL('image/png');
         a.click();
         toast('PNG exported');
@@ -1994,6 +2219,9 @@
         document.getElementById('schemeSelect').value = state.doc.scheme;
         document.getElementById('bandSelect').value   = state.doc.band ?? 'broadband';
         document.getElementById('groundType').value   = state.doc.groundType;
+        document.getElementById('eventName').value     = state.doc.eventName     ?? '';
+        document.getElementById('eventDate').value     = state.doc.eventDate     ?? '';
+        document.getElementById('eventLocation').value = state.doc.eventLocation ?? '';
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2138,6 +2366,25 @@
         document.getElementById('mapUpload').addEventListener('change', handleMapUpload);
         document.getElementById('themeBtn').addEventListener('click', toggleTheme);
 
+        // Event detail fields — live-update state.doc (no dirty flag needed, export-only)
+        ['eventName', 'eventDate', 'eventLocation'].forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                state.doc[id] = e.target.value;
+            });
+        });
+
+        // Help modal
+        const helpModal = document.getElementById('helpModal');
+        document.getElementById('helpBtn').addEventListener('click', () => {
+            helpModal.classList.toggle('open');
+        });
+        document.getElementById('helpClose').addEventListener('click', () => {
+            helpModal.classList.remove('open');
+        });
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) helpModal.classList.remove('open');
+        });
+
         window.addEventListener('keydown', (e) => {
             if (e.target.matches('input, textarea, select')) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -2180,5 +2427,69 @@
 
     window.addEventListener('DOMContentLoaded', init);
     </script>
+    <!-- ═══ Help modal ══════════════════════════════════════════════════ -->
+    <div id="helpModal" class="modal-overlay">
+        <div class="modal-panel">
+            <div class="help-sec" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;">
+                <span style="font-weight:600;font-size:13px;color:var(--text-1)">How to use</span>
+                <button id="helpClose" class="btn btn-ghost btn-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="help-sec">
+                <div class="help-h2">Quick start</div>
+                <p class="help-p"><strong>1. Set scale</strong> — use the px/m slider to match your site map. 10 px/m suits most single-stage sites; use 5 px/m for larger festivals. Upload a map image with the Map button.</p>
+                <p class="help-p"><strong>2. Place speakers</strong> — select the Speaker tool and click the canvas. Set SPL, beam angle, bass bias, and mount height in the inspector.</p>
+                <p class="help-p"><strong>3. Add zones</strong> — drag zone shapes to define areas (Stage, Camping, Dancefloor…). The schedule panel shows estimated SPL at each zone centre.</p>
+                <p class="help-p"><strong>4. Add barriers</strong> — Heras panels and hay bales block and absorb sound. Place between sources and sensitive areas; angle for best effect.</p>
+                <p class="help-p"><strong>5. Check frequencies</strong> — switch to Low (125 Hz) to see bass propagation. This is usually the noise-compliance concern for camping and residential areas.</p>
+                <p class="help-p"><strong>6. Export</strong> — fill in the event details in the sidebar, then export a PNG containing the heatmap and the full SPL table.</p>
+            </div>
+
+            <div class="help-sec">
+                <div class="help-h2">Tools</div>
+                <p class="help-p"><strong>Speaker</strong> — click to place. Peak SPL sets the source level; dispersion angle narrows or widens the coverage cone; bass bias shifts spectral energy towards low or high frequencies; mount height affects diffraction over barriers.</p>
+                <p class="help-p"><strong>Hay Bales</strong> — absorptive barriers (~1.5 m). Effective at mid/high frequencies, limited at bass. Works best angled as a baffle rather than a straight wall — use the Rotation slider.</p>
+                <p class="help-p"><strong>Heras Panel</strong> — covered acoustic fencing (3.5 m). Good broadband attenuation. Adjust the Reflection slider to model bare vs. acoustic-blanket-covered panels.</p>
+                <p class="help-p"><strong>Ruler</strong> — click and drag to measure any distance on the canvas. Reading shown in metres.</p>
+                <p class="help-p"><strong>Zone palette</strong> — areas for the SPL schedule. Canopy zones (stretch tents) are acoustically transparent and are excluded from the SPL table. Speakers under a canopy show a dashed indicator ring.</p>
+            </div>
+
+            <div class="help-sec">
+                <div class="help-h2">Acoustic model</div>
+                <p class="help-p"><strong>Scale</strong> — set this before placing anything. All distance and SPL calculations derive from it; changing it later does not rescale existing items.</p>
+                <p class="help-p"><strong>Ground type</strong> — grass attenuates mid/high frequencies more than hard standing (ground absorbs the reflected wave). Concrete adds a ~3 dB boost from constructive ground reflection.</p>
+                <p class="help-p"><strong>Barriers</strong> — height dominates. A 4 m barrier gives roughly 9 dB insertion loss at 125 Hz and 23 dB at 4 kHz (Maekawa formula). Use the Reflection slider to model barrier solidity; Absorption to model transmission loss through thin or porous surfaces.</p>
+                <p class="help-p"><strong>Canopy zones</strong> — stretch tents and open-sided structures pass sound through and cast no acoustic shadow. Speakers placed under them are unaffected and are shown with a dashed ring.</p>
+                <p class="help-p"><strong>Wind</strong> — boosts SPL downwind and attenuates it upwind, scaled by distance. Set speed and bearing to model prevailing conditions during the event.</p>
+                <p class="help-p"><strong>Bass bias</strong> on speakers shifts spectral energy between the 125 Hz, 1 kHz, and 4 kHz bands. The broadband view sums all three; individual band views show frequency-specific propagation.</p>
+            </div>
+
+            <div class="help-sec">
+                <div class="help-h2">Keyboard shortcuts</div>
+                <div class="help-kv">
+                    <span class="help-key">Scroll</span><span class="help-val">Zoom in / out centred on cursor</span>
+                    <span class="help-key">Space + drag</span><span class="help-val">Pan the canvas</span>
+                    <span class="help-key">Middle drag</span><span class="help-val">Pan the canvas</span>
+                    <span class="help-key">0</span><span class="help-val">Reset view to 1:1</span>
+                    <span class="help-key">⌘Z / Ctrl Z</span><span class="help-val">Undo</span>
+                    <span class="help-key">⌘⇧Z / Ctrl Y</span><span class="help-val">Redo</span>
+                    <span class="help-key">Del / Backspace</span><span class="help-val">Delete selected element</span>
+                    <span class="help-key">Esc</span><span class="help-val">Deselect</span>
+                </div>
+            </div>
+
+            <div class="help-sec">
+                <div class="help-h2">Festival planning tips</div>
+                <p class="help-p">Set scale before placing anything — it cannot be changed without manually repositioning all items.</p>
+                <p class="help-p">Upload your site map and lower the Map Opacity slider until the heatmap colours read clearly through it.</p>
+                <p class="help-p">Place speakers first, then add zones to see SPL readings in context. The schedule panel updates in real time as you drag elements.</p>
+                <p class="help-p">Low band (125 Hz) is almost always the compliance concern. Check this view for camping areas and any residential boundaries near the site.</p>
+                <p class="help-p">Save the project JSON at the end of each session — it preserves all placements, settings, and event details for the next review or handoff.</p>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
