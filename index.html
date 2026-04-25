@@ -555,9 +555,19 @@
         concrete: 0.7
     };
 
-    // Per-band multipliers: low freq absorbed/blocked less; high freq absorbed/blocked more
-    const BAND_ABS_SCALE   = { low: 0.6, mid: 1.0, high: 1.4 };
-    const BAND_BLOCK_SCALE = { low: 0.75, mid: 1.0, high: 1.2 };
+    // Band centre frequencies (Hz) — used in the Maekawa barrier insertion-loss formula
+    const BAND_FREQ = { low: 125, mid: 1000, high: 4000 };
+
+    // Ground effect: additive dB correction versus free-field inverse-square law.
+    // Positive = extra attenuation (soft ground absorbs reflected wave).
+    // Negative = boost (hard ground adds a coherent reflected path, ~+3 dB near field).
+    // Values are frequency-dependent: ground effect is negligible at low frequencies
+    // and peaks in the mid/high range (ISO 9613-2 inspired, simplified).
+    const GROUND_EFFECT = {
+        grass:    { low:  3.0, mid:  5.0, high:  6.5 },
+        compact:  { low:  0.0, mid:  0.0, high:  0.0 },
+        concrete: { low: -1.5, mid: -2.5, high: -3.0 }
+    };
 
     const MATERIAL_PRESETS = {
         open:           { label: "Air / Open Space",          abs: 1,  blocking: 0.05, type: 'vol' },
@@ -813,61 +823,79 @@
         return false;
     }
 
-    // Per-source band output — bassBias skews energy between frequency bands
+    // Per-source band output — bassBias skews energy between frequency bands.
+    // Weights always sum to 1.0 so broadband total power is conserved.
     function getSourceBandDb(source, band) {
         const low  = 0.15 + (source.bassBias / 100) * 0.35;  // 0.15–0.50
         const high = 0.20 + (1 - source.bassBias / 100) * 0.30; // 0.20–0.50
         const mid  = Math.max(0.01, 1 - low - high);
-        const weight = band === 'low' ? low : band === 'high' ? high : mid;
-        return source.db + 10 * Math.log10(Math.max(weight, 0.001));
+        const w = band === 'low' ? low : band === 'high' ? high : mid;
+        return source.db + 10 * Math.log10(Math.max(w, 0.001));
     }
 
-    // Air absorption increases sharply with frequency
+    // Atmospheric absorption coefficient (dB per 50 m), increases with frequency.
+    // Approximation of ISO 9613-1 at 20°C, 70% RH, representative outdoor conditions.
     function getAirAbsorption(band) {
         if (band === 'high') return 0.9;
         if (band === 'mid')  return 0.45;
-        if (band === 'low')  return 0.2;
+        if (band === 'low')  return 0.1;
         return 0;
     }
 
+    // Maekawa barrier insertion loss (dB).
+    // N  = Fresnel number = 2 * f * pathDiff / c
+    // IL = 10 * log10(3 + 20N), capped at 25 dB (diffraction limit).
+    // pathDiff is the extra path length (m) sound must travel over the barrier top.
+    // Approximated here as h²/(2d) for normal incidence — valid when d >> h.
+    function maekawaIL(freq, hEff, distM) {
+        const pathDiff = (hEff * hEff) / (2 * Math.max(1, distM));
+        const N = 2 * freq * pathDiff / 343;
+        return Math.min(25, 10 * Math.log10(3 + 20 * Math.max(0, N)));
+    }
+
+    // Core intensity calculation.
+    // All three bands are computed in a single obstacle-loop pass, which is
+    // cheaper for broadband than the previous three-recursive-call approach and
+    // frees budget for the Maekawa formula inside the same loop.
     function calculateIntensity(s, tx, ty, obstacles, band) {
-        // Broadband = sum of three bands
-        if (band === 'broadband') {
-            return ['low', 'mid', 'high'].reduce(
-                (sum, b) => sum + calculateIntensity(s, tx, ty, obstacles, b), 0
-            );
-        }
-
         const { scale, windSpeed, windDir } = state.doc;
-        const gf = groundFactor();
-        const distM = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
-        let db = getSourceBandDb(s, band) - (20 * gf * Math.log10(distM));
-        db -= getAirAbsorption(band) * distM / 50;
+        const distM  = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
+        const log10d = Math.log10(distM);
+        const ge     = GROUND_EFFECT[state.doc.groundType] ?? { low: 0, mid: 0, high: 0 };
 
+        // Base SPL per band = source level − ISL − air absorption − ground effect
+        let dbL = getSourceBandDb(s, 'low')  - 20*log10d - getAirAbsorption('low')  * distM/50 - ge.low;
+        let dbM = getSourceBandDb(s, 'mid')  - 20*log10d - getAirAbsorption('mid')  * distM/50 - ge.mid;
+        let dbH = getSourceBandDb(s, 'high') - 20*log10d - getAirAbsorption('high') * distM/50 - ge.high;
+
+        // Wind: uniform across bands at this level of modelling
         if (windSpeed > 0) {
-            const aP = Math.atan2(ty - s.y, tx - s.x);
-            const wR = windDir * (Math.PI / 180);
-            db += (windSpeed / 25) * Math.cos(aP - wR) * (distM / 40);
+            const aP  = Math.atan2(ty - s.y, tx - s.x);
+            const wR  = windDir * (Math.PI / 180);
+            const adj = (windSpeed / 25) * Math.cos(aP - wR) * (distM / 40);
+            dbL += adj; dbM += adj; dbH += adj;
         }
 
+        // Beam directivity — smooth linear rolloff beyond the cone edge.
+        // Avoids the hard 20 dB step of the previous model.
         if (s.beam < 360) {
-            const aP = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI);
-            let diff = Math.abs(aP - s.angle) % 360;
+            const aP  = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI);
+            let diff  = Math.abs(aP - s.angle) % 360;
             if (diff > 180) diff = 360 - diff;
-            if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS;
+            if (diff > s.beam / 2) {
+                const t   = Math.min(1, (diff - s.beam / 2) / Math.max(1, s.beam / 2));
+                const att = t * ATTENUATION_OFF_AXIS;
+                dbL -= att; dbM -= att; dbH -= att;
+            }
         }
 
-        const absScale   = BAND_ABS_SCALE[band]   ?? 1.0;
-        const blockScale = BAND_BLOCK_SCALE[band]  ?? 1.0;
-
+        // Obstacle attenuation — geometry computed once, applied to all bands.
         for (const o of obstacles) {
             const m = MATERIAL_PRESETS[o.material];
             if (m.type === 'canopy') continue;
-
             const sIn = isPointInItem(s.x, s.y, o);
             const tIn = isPointInItem(tx, ty, o);
             if (m.type === 'shell' && sIn && tIn) continue;
-
             const iL = getIntersectionLength(s.x, s.y, tx, ty, o);
             if (iL <= 0) continue;
 
@@ -875,41 +903,51 @@
                 ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3)
                 : 1.0;
 
-            // absorption (0–100) governs transmission loss through thin surfaces
-            // reflection (0–100) governs blocking by tall barriers
-            const absVal   = Math.min(1.5, (o.absorption   / 100) * absScale);
-            const blockVal = Math.min(1.0, (o.reflection   / 100) * blockScale);
-
             if (o.vHeight > 0.5) {
-                db -= Math.min(22, o.vHeight * 6) * blockVal * diffra;
+                // Tall barrier: Maekawa insertion loss, frequency-dependent.
+                // hEff = effective barrier height above the source–receiver line of sight.
+                const hEff  = Math.max(0, o.vHeight - s.vHeight * 0.5);
+                const block = (o.reflection / 100) * diffra;
+                dbL -= maekawaIL(BAND_FREQ.low,  hEff, distM) * block;
+                dbM -= maekawaIL(BAND_FREQ.mid,  hEff, distM) * block;
+                dbH -= maekawaIL(BAND_FREQ.high, hEff, distM) * block;
             } else {
-                db -= (iL / scale) * absVal * 10;
+                // Thin/flat surface: frequency-dependent absorption.
+                // High frequencies are absorbed significantly more than low.
+                const absBase = (o.absorption / 100) * (iL / scale) * 10;
+                dbL -= absBase * 0.55;
+                dbM -= absBase * 1.0;
+                dbH -= absBase * 1.5;
             }
         }
 
+        if (band === 'broadband') {
+            return Math.pow(10, dbL/10) + Math.pow(10, dbM/10) + Math.pow(10, dbH/10);
+        }
+        const db = band === 'low' ? dbL : band === 'mid' ? dbM : dbH;
         return Math.pow(10, db / 10);
     }
 
     function calculateTotalDb(x, y) {
-        const band = state.doc.band ?? 'broadband';
-        const items = state.doc.items;
-        const sources = items.filter(i => i.type === 'source');
-        const obstacles = items.filter(i => i.type !== 'source');
+        const band      = state.doc.band ?? 'broadband';
+        const sources   = state.doc.items.filter(i => i.type === 'source');
+        const obstacles = state.doc.items.filter(i => i.type !== 'source');
         let total = 0;
 
         for (const s of sources) {
             total += calculateIntensity(s, x, y, obstacles, band);
 
-            // Reflections — only from surfaces with meaningful reflection coefficient
+            // Image-source reflections — surfaces with meaningful reflection only
             for (const o of obstacles) {
                 const m = MATERIAL_PRESETS[o.material];
                 if (m.type === 'vol' || (o.reflection ?? 0) < 30) continue;
-                const imgS = getMirroredPoint(s.x, s.y, o);
-                const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / state.doc.scale);
+                const imgS     = getMirroredPoint(s.x, s.y, o);
+                const distM    = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / state.doc.scale);
                 const reflCoeff = Math.min(0.99, o.reflection / 100);
-                const reflLoss = -10 * Math.log10(1 - reflCoeff);
-                const srcDb = (band === 'broadband') ? s.db : getSourceBandDb(s, band);
-                const db = srcDb - (20 * distM) - reflLoss;
+                const reflLoss  = -10 * Math.log10(1 - reflCoeff);
+                const srcDb     = (band === 'broadband') ? s.db : getSourceBandDb(s, band);
+                // BUG FIX: was `20 * distM` (treating metres as dB) — now correct ISL
+                const db        = srcDb - 20 * Math.log10(distM) - reflLoss;
                 if (isReflectionValid(s, { x, y }, o)) {
                     total += Math.pow(10, db / 10);
                 }
