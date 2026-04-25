@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acoustic Site Planner</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -335,6 +334,44 @@
             font-weight: 400;
             margin-left: 6px;
         }
+
+        /* ─── Layout utilities (replaces Tailwind CDN) ─────────────────── */
+        .flex           { display: flex; }
+        .flex-col       { flex-direction: column; }
+        .flex-1         { flex: 1 1 0%; min-width: 0; min-height: 0; }
+        .shrink-0       { flex-shrink: 0; }
+        .items-center   { align-items: center; }
+        .items-start    { align-items: flex-start; }
+        .justify-between{ justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .grid           { display: grid; }
+        .grid-cols-2    { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3    { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .overflow-hidden{ overflow: hidden; }
+        .overflow-y-auto{ overflow-y: auto; }
+        .relative       { position: relative; }
+        .h-screen       { height: 100vh; }
+        .h-5            { height: 1.25rem; }
+        .h-12           { height: 3rem; }
+        .w-full         { width: 100%; }
+        .w-px           { width: 1px; }
+        .w-\[280px\]    { width: 280px; }
+        .hidden         { display: none !important; }
+        .text-center    { text-align: center; }
+        .cursor-pointer { cursor: pointer; }
+        .gap-1          { gap: 0.25rem; }
+        .gap-1\.5       { gap: 0.375rem; }
+        .gap-2          { gap: 0.5rem; }
+        .gap-3          { gap: 0.75rem; }
+        .gap-4          { gap: 1rem; }
+        .gap-6          { gap: 1.5rem; }
+        .p-4            { padding: 1rem; }
+        .px-4           { padding-left: 1rem; padding-right: 1rem; }
+        .pb-2           { padding-bottom: 0.5rem; }
+        .mb-1\.5        { margin-bottom: 0.375rem; }
+        .mb-3           { margin-bottom: 0.75rem; }
+        .mt-1           { margin-top: 0.25rem; }
+        .mx-1           { margin-left: 0.25rem; margin-right: 0.25rem; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -497,6 +534,10 @@
                     <span class="hud-label">SPL</span>
                     <span class="hud-value" id="currentDb">—</span>
                     <span class="hud-label">dB</span>
+                </div>
+                <div class="hud-cell" title="Scroll to zoom · Space+drag to pan · 0 to reset">
+                    <span class="hud-label">Zoom</span>
+                    <span class="hud-value mono" id="zoomDisplay">100%</span>
                 </div>
             </div>
         </div>
@@ -705,7 +746,12 @@
             backgroundImage: null,
             width: 0,
             height: 0,
-            theme: 'dark'
+            theme: 'dark',
+            pan: { x: 0, y: 0 },
+            zoom: 1.0,
+            isPanning: false,
+            panAnchor: null,
+            spaceDown: false
         },
         history: { past: [], future: [] }
     };
@@ -1020,12 +1066,13 @@
         offCtx.clearRect(0, 0, width, height);
         const scheme = INTENSITY_SCHEMES[state.doc.scheme];
         const floor = state.doc.noiseFloor;
-        for (let x = 0; x < width; x += HEATMAP_STEP) {
-            for (let y = 0; y < height; y += HEATMAP_STEP) {
-                const db = calculateTotalDb(x, y);
+        for (let sx = 0; sx < width; sx += HEATMAP_STEP) {
+            for (let sy = 0; sy < height; sy += HEATMAP_STEP) {
+                const { x: wx, y: wy } = screenToWorld(sx, sy);
+                const db = calculateTotalDb(wx, wy);
                 if (db > floor + 1) {
                     offCtx.fillStyle = scheme(db, Math.min(0.25, (db - 30) / 120));
-                    offCtx.fillRect(x, y, HEATMAP_STEP + 1, HEATMAP_STEP + 1);
+                    offCtx.fillRect(sx, sy, HEATMAP_STEP + 1, HEATMAP_STEP + 1);
                 }
             }
         }
@@ -1036,12 +1083,18 @@
         if (!state.ui.backgroundImage) return;
         const img = state.ui.backgroundImage;
         const { width, height } = state.ui;
-        ctx.globalAlpha = state.doc.mapOpacity / 100;
+        // Image lives in world space — fit it to the home viewport dimensions
+        // (what fills the screen at zoom=1, pan=0) so it pans/zooms with everything.
         const r = img.width / img.height;
         let dw = width, dh = width / r;
         if (r < width / height) { dh = height; dw = height * r; }
+        ctx.save();
+        ctx.globalAlpha = state.doc.mapOpacity / 100;
+        ctx.translate(state.ui.pan.x, state.ui.pan.y);
+        ctx.scale(state.ui.zoom, state.ui.zoom);
         ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
         ctx.globalAlpha = 1.0;
+        ctx.restore();
     }
 
     // Schedule panel — now a clean data table, no glow, no gradient border.
@@ -1086,7 +1139,8 @@
         // Rows
         zones.forEach((o, i) => {
             const y = headerH + 6 + (i * rowH) + rowH / 2;
-            const dbV = calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+            const isCanopy = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+            const dbV = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
 
             // Zone colour dot
             const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
@@ -1100,16 +1154,21 @@
             ctx.font = '500 11px Inter';
             ctx.fillText(o.label, 28, y);
 
-            // Material
-            ctx.fillStyle = canvasColors.text2;
+            // Material — canopy surfaces noted as pass-through
+            ctx.fillStyle = isCanopy ? canvasColors.text3 : canvasColors.text2;
             ctx.font = '400 10px Inter';
-            ctx.fillText(o.material, 130, y);
+            ctx.fillText(isCanopy ? 'pass-through' : o.material, 130, y);
 
-            // dB — monospace, accent colour if above 85dB
-            ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
+            // dB — suppressed for canopy (it casts no shadow, reading is misleading)
             ctx.font = '500 11px "JetBrains Mono"';
             ctx.textAlign = 'right';
-            ctx.fillText(`${Math.round(dbV)} dB`, panelW - 12, y);
+            if (isCanopy) {
+                ctx.fillStyle = canvasColors.text3;
+                ctx.fillText('—', panelW - 12, y);
+            } else {
+                ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
+                ctx.fillText(`${Math.round(dbV)} dB`, panelW - 12, y);
+            }
             ctx.textAlign = 'start';
         });
 
@@ -1206,19 +1265,20 @@
         const end = state.ui.rulerEnd;
         if (!start || !end) return;
 
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const dist = Math.hypot(dx, dy) / state.doc.scale;
-        const midX = start.x + dx * 0.5;
-        const midY = start.y + dy * 0.5;
+        // Ruler stored in world coords — convert to screen for drawing
+        const ss = worldToScreen(start.x, start.y);
+        const se = worldToScreen(end.x, end.y);
+        const dist = Math.hypot(end.x - start.x, end.y - start.y) / state.doc.scale;
+        const midX = (ss.x + se.x) / 2;
+        const midY = (ss.y + se.y) / 2;
 
         ctx.save();
         ctx.strokeStyle = canvasColors.accent;
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 6]);
         ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
+        ctx.moveTo(ss.x, ss.y);
+        ctx.lineTo(se.x, se.y);
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -1289,6 +1349,29 @@
             ctx.lineWidth = 2;
             ctx.strokeStyle = canvasColors.text1;
             ctx.stroke();
+
+            // Canopy indicator — dashed ring + zone-colour label when speaker sits
+            // inside a stretch-tent / canopy zone (which passes sound through).
+            const canopy = getCanopyForSource(item);
+            if (canopy) {
+                const cc = ZONE_CONFIG[canopy.type]?.color ?? canvasColors.text2;
+                ctx.save();
+                ctx.setLineDash([3, 3]);
+                ctx.strokeStyle = cc;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, 14, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Small label above — "tent" shorthand
+                ctx.fillStyle = cc;
+                ctx.font = '500 8px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillText('canopy', 0, -18);
+                ctx.textAlign = 'start';
+                ctx.restore();
+            }
         } else {
             const cfg = ZONE_CONFIG[item.type] || { color: canvasColors.text3 };
 
@@ -1353,7 +1436,15 @@
         renderBackground();
         if (dirty.heatmap) renderHeatmap();
         ctx.drawImage(offscreenHeatmap, 0, 0);
+
+        // World-space items — drawn inside the viewport transform
+        ctx.save();
+        ctx.translate(state.ui.pan.x, state.ui.pan.y);
+        ctx.scale(state.ui.zoom, state.ui.zoom);
         for (const item of state.doc.items) renderItem(item);
+        ctx.restore();
+
+        // Screen-space overlays — always fixed to the canvas edges
         renderSchedule();
         renderLegend();
         renderCalibrationBar();
@@ -1491,6 +1582,15 @@
             grid.appendChild(numberField(item, 'vHeight', 'Mount height (m)'));
             grid.appendChild(numberField(item, 'bassBias', 'Bass bias'));
             container.appendChild(grid);
+
+            // Warn if this speaker sits inside a canopy zone
+            const canopy = getCanopyForSource(item);
+            if (canopy) {
+                const note = el('div');
+                note.style.cssText = 'font-size:11px;line-height:1.5;padding:8px 10px;border-radius:3px;border:1px solid var(--accent);background:var(--accent-faint);color:var(--text-1)';
+                note.innerHTML = `<strong style="color:var(--accent)">Under canopy</strong><br>Inside <em>${canopy.label}</em> — canopy surfaces are acoustically transparent and cast no shadow. SPL from this speaker is unaffected by the tent.`;
+                container.appendChild(note);
+            }
         } else {
             container.appendChild(textField(item, 'label', 'Label'));
             const grid = el('div', 'grid grid-cols-3 gap-2');
@@ -1507,6 +1607,14 @@
             absReflGrid.appendChild(sliderField(item, 'absorption', 'Absorption (0–100)', 0, 100));
             absReflGrid.appendChild(sliderField(item, 'reflection',  'Reflection (0–100)', 0, 100));
             container.appendChild(absReflGrid);
+
+            // Explain canopy behaviour when the zone uses a pass-through material
+            if (MATERIAL_PRESETS[item.material]?.type === 'canopy') {
+                const note = el('div');
+                note.style.cssText = 'font-size:11px;line-height:1.5;padding:8px 10px;border-radius:3px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2)';
+                note.textContent = 'Canopy/tent surfaces pass sound through — this zone casts no acoustic shadow and is excluded from the SPL schedule. Speakers placed under it remain fully effective.';
+                container.appendChild(note);
+            }
         }
 
         container.appendChild(sliderField(item, 'angle', 'Rotation (°)', 0, 359));
@@ -1569,9 +1677,38 @@
     // 9. INPUT HANDLING
     // ═══════════════════════════════════════════════════════════════════════
 
-    function getMousePos(e) {
+    // Viewport coordinate transforms.
+    // World coords = item/acoustic space (unchanged by pan/zoom).
+    // Screen coords = canvas pixel position.
+    function screenToWorld(sx, sy) {
+        return { x: (sx - state.ui.pan.x) / state.ui.zoom,
+                 y: (sy - state.ui.pan.y) / state.ui.zoom };
+    }
+    function worldToScreen(wx, wy) {
+        return { x: wx * state.ui.zoom + state.ui.pan.x,
+                 y: wy * state.ui.zoom + state.ui.pan.y };
+    }
+    function getScreenPos(e) {
         const r = canvas.getBoundingClientRect();
         return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function updateZoomDisplay() {
+        const d = document.getElementById('zoomDisplay');
+        if (d) d.textContent = Math.round(state.ui.zoom * 100) + '%';
+    }
+
+    // Returns the first canopy-type zone that contains a source, or null.
+    function getCanopyForSource(source) {
+        return state.doc.items.find(item =>
+            item.type !== 'source' &&
+            MATERIAL_PRESETS[item.material]?.type === 'canopy' &&
+            isPointInItem(source.x, source.y, item)
+        ) ?? null;
+    }
+
+    function getMousePos(e) {
+        const s = getScreenPos(e);
+        return screenToWorld(s.x, s.y);
     }
 
     function findItemAt(pos) {
@@ -1582,8 +1719,21 @@
     }
 
     function handleMouseDown(e) {
-        const pos = getMousePos(e);
+        const screenPos = getScreenPos(e);
+        const pos = screenToWorld(screenPos.x, screenPos.y);
         const mode = state.ui.mode;
+
+        // Middle mouse button OR space+left-drag = pan
+        if (e.button === 1 || (e.button === 0 && state.ui.spaceDown)) {
+            e.preventDefault();
+            state.ui.isPanning = true;
+            state.ui.panAnchor = {
+                sx: screenPos.x, sy: screenPos.y,
+                ox: state.ui.pan.x, oy: state.ui.pan.y
+            };
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
 
         if (mode === 'ruler') {
             state.ui.rulerStart = pos;
@@ -1627,7 +1777,17 @@
     }
 
     function handleMouseMove(e) {
-        const pos = getMousePos(e);
+        const screenPos = getScreenPos(e);
+
+        if (state.ui.isPanning) {
+            const a = state.ui.panAnchor;
+            state.ui.pan.x = a.ox + (screenPos.x - a.sx);
+            state.ui.pan.y = a.oy + (screenPos.y - a.sy);
+            markDirty('canvas', 'heatmap');
+            return;
+        }
+
+        const pos = screenToWorld(screenPos.x, screenPos.y);
         document.getElementById('xyDisplay').textContent =
             `${Math.round(pos.x / state.doc.scale)}, ${Math.round(pos.y / state.doc.scale)}`;
 
@@ -1650,7 +1810,13 @@
         }
     }
 
-    function handleMouseUp() {
+    function handleMouseUp(e) {
+        if (state.ui.isPanning) {
+            state.ui.isPanning = false;
+            state.ui.panAnchor = null;
+            canvas.style.cursor = state.ui.spaceDown ? 'grab' : '';
+            return;
+        }
         state.ui.isDragging = false;
         state.ui.rulerStart = null;
         state.ui.rulerEnd = null;
@@ -1896,6 +2062,58 @@
         canvas.addEventListener('mousedown', handleMouseDown);
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseup', handleMouseUp);
+        // Suppress context menu on middle-click
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Scroll to zoom, centred on cursor
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const s = getScreenPos(e);
+            const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+            const newZoom = Math.max(0.15, Math.min(6, state.ui.zoom * factor));
+            state.ui.pan.x = s.x - (s.x - state.ui.pan.x) * (newZoom / state.ui.zoom);
+            state.ui.pan.y = s.y - (s.y - state.ui.pan.y) * (newZoom / state.ui.zoom);
+            state.ui.zoom = newZoom;
+            updateZoomDisplay();
+            markDirty('canvas', 'heatmap');
+        }, { passive: false });
+
+        // Two-finger pan + pinch-to-zoom (tablets / trackpads)
+        let _lastTouches = [];
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                _lastTouches = [
+                    { x: e.touches[0].clientX, y: e.touches[0].clientY },
+                    { x: e.touches[1].clientX, y: e.touches[1].clientY }
+                ];
+            }
+        }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 2 || _lastTouches.length !== 2) return;
+            e.preventDefault();
+            const t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            const t1 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
+            const l0 = _lastTouches[0], l1 = _lastTouches[1];
+            // Pan from midpoint delta
+            const midX = (t0.x + t1.x) / 2, midY = (t0.y + t1.y) / 2;
+            const lmidX = (l0.x + l1.x) / 2, lmidY = (l0.y + l1.y) / 2;
+            state.ui.pan.x += midX - lmidX;
+            state.ui.pan.y += midY - lmidY;
+            // Pinch zoom centred on midpoint
+            const dist  = Math.hypot(t0.x - t1.x, t0.y - t1.y);
+            const ldist = Math.hypot(l0.x - l1.x, l0.y - l1.y);
+            if (ldist > 0) {
+                const newZoom = Math.max(0.15, Math.min(6, state.ui.zoom * dist / ldist));
+                state.ui.pan.x = midX - (midX - state.ui.pan.x) * (newZoom / state.ui.zoom);
+                state.ui.pan.y = midY - (midY - state.ui.pan.y) * (newZoom / state.ui.zoom);
+                state.ui.zoom = newZoom;
+                updateZoomDisplay();
+            }
+            _lastTouches = [t0, t1];
+            markDirty('canvas', 'heatmap');
+        }, { passive: false });
+        canvas.addEventListener('touchend', () => { _lastTouches = []; });
 
         bindPairedInput('scaleInput', 'scaleSlider', 'scale');
         bindPairedInput('brightnessInput', 'brightnessSlider', 'mapOpacity', parseInt, 'canvas');
@@ -1935,6 +2153,23 @@
             } else if (e.key === 'Escape') {
                 state.ui.selectedId = null;
                 markDirty('canvas', 'inspector');
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                state.ui.spaceDown = true;
+                if (!state.ui.isPanning) canvas.style.cursor = 'grab';
+            } else if (e.key === '0') {
+                // Reset view to 1:1 centred
+                state.ui.pan = { x: 0, y: 0 };
+                state.ui.zoom = 1.0;
+                updateZoomDisplay();
+                markDirty('canvas', 'heatmap');
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === ' ') {
+                state.ui.spaceDown = false;
+                if (!state.ui.isPanning) canvas.style.cursor = '';
             }
         });
 
