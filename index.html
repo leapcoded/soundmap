@@ -1945,16 +1945,18 @@
     function exportPNG() {
         const { width, height } = state.ui;
         const zones   = state.doc.items.filter(i => i.type !== 'source');
+        const sources = state.doc.items.filter(i => i.type === 'source');
         const eW      = EXPORT_WIDTH;
         const factor  = eW / width;
         const mapH    = Math.round(eW * (height / width));
 
         // Layout heights
-        const hH      = 110;                                       // event header band
+        const hH      = 110;
         const tRowH   = 38;
         const tHeadH  = 44;
         const tPad    = 24;
-        const tH      = zones.length ? (tHeadH + zones.length * tRowH + tPad) : 0;
+        const hasTable = sources.length > 0 || zones.length > 0;
+        const tH      = hasTable ? (tHeadH + Math.max(sources.length, zones.length) * tRowH + tPad) : 0;
         const totalH  = hH + mapH + tH;
 
         const tC   = document.createElement('canvas');
@@ -2046,47 +2048,222 @@
             tCtx.translate(cx, cy);
             tCtx.rotate(item.angle * Math.PI / 180);
             if (item.type === 'source') {
+                const srcNum = sources.indexOf(item) + 1;
+                // Slightly larger dot than live canvas for print legibility
                 tCtx.beginPath();
-                tCtx.arc(0, 0, 15, 0, Math.PI * 2);
+                tCtx.arc(0, 0, 20, 0, Math.PI * 2);
                 tCtx.fillStyle = acc;
                 tCtx.fill();
+                // Direction tick
                 tCtx.beginPath();
-                tCtx.moveTo(10, 0); tCtx.lineTo(22, 0);
-                tCtx.strokeStyle = bg; tCtx.lineWidth = 4; tCtx.stroke();
+                tCtx.moveTo(14, 0); tCtx.lineTo(30, 0);
+                tCtx.strokeStyle = bg; tCtx.lineWidth = 5; tCtx.stroke();
+                // Source number — counter-rotated so it's always upright
+                tCtx.save();
+                tCtx.rotate(-item.angle * Math.PI / 180);
+                tCtx.fillStyle = bg;
+                tCtx.font = 'bold 15px Inter, sans-serif';
+                tCtx.textAlign = 'center';
+                tCtx.textBaseline = 'middle';
+                tCtx.fillText(srcNum, 0, 0);
+                tCtx.textAlign = 'start';
+                tCtx.textBaseline = 'alphabetic';
+                tCtx.restore();
             } else {
-                const cfg = ZONE_CONFIG[item.type] || { color: t2 };
+                const cfg      = ZONE_CONFIG[item.type] || { color: t2 };
+                const isCanopy = MATERIAL_PRESETS[item.material]?.type === 'canopy';
+
+                // Subtle zone fill (same tint as live canvas)
+                tCtx.fillStyle = cfg.color + '28';
+                tCtx.fillRect(-w/2, -h/2, w, h);
+
+                // Zone border
                 tCtx.strokeStyle = cfg.color;
                 tCtx.lineWidth = 4;
                 tCtx.strokeRect(-w/2, -h/2, w, h);
-                tCtx.fillStyle = t1;
-                tCtx.font = '500 24px Inter, sans-serif';
-                tCtx.fillText(item.label, -w/2 + 12, -h/2 + 36);
+
+                // Label and dB — only when zone is large enough (mirrors live canvas threshold).
+                // Text shadow creates contrast over any heatmap colour or background.
+                if (item.w > 60 && item.h > 32) {
+                    tCtx.shadowColor = 'rgba(0,0,0,0.80)';
+                    tCtx.shadowBlur  = 8;
+
+                    // Zone label (top-left)
+                    tCtx.fillStyle = '#ffffff';
+                    tCtx.font = '500 26px Inter, sans-serif';
+                    tCtx.textBaseline = 'alphabetic';
+                    tCtx.fillText(item.label, -w/2 + 14, -h/2 + 36);
+
+                    // SPL reading (bottom-left, mono) — skip for canopy zones
+                    if (!isCanopy && item.h > 60) {
+                        const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
+                        tCtx.font = `600 28px "JetBrains Mono", monospace`;
+                        tCtx.fillStyle = dbV > 85 ? acc : '#ffffff';
+                        tCtx.fillText(`${Math.round(dbV)} dB`, -w/2 + 14, h/2 - 14);
+                    }
+
+                    tCtx.shadowBlur = 0;
+                }
             }
             tCtx.restore();
         }
 
-        // ── SPL TABLE ────────────────────────────────────────────────────
-        if (zones.length) {
-            const tY = hH + mapH;
+        // ── LEGEND (top-left of map area) ───────────────────────────────
+        {
+            const lPad = 44, lX = lPad, lY = hH + lPad;
+            const sW = 18, sH = 300;
+            // Card background
+            tCtx.fillStyle = surf;
+            tCtx.globalAlpha = 0.88;
+            tCtx.fillRect(lX - 10, lY - 8, sW + 92, sH + 42);
+            tCtx.globalAlpha = 1.0;
+            tCtx.strokeStyle = bord; tCtx.lineWidth = 1;
+            tCtx.strokeRect(lX - 10 + 0.5, lY - 8 + 0.5, sW + 92 - 1, sH + 42 - 1);
+
+            // "SPL (dB)" label
+            tCtx.fillStyle = t3;
+            tCtx.font = '500 20px Inter, sans-serif';
+            tCtx.textBaseline = 'alphabetic';
+            tCtx.fillText('SPL (dB)', lX, lY + 14);
+
+            // Colour strip
+            for (let i = 0; i < sH; i += 3) {
+                const db = 30 + ((sH - i) / sH) * 100;
+                tCtx.fillStyle = scheme(db, 0.9);
+                tCtx.fillRect(lX, lY + 22 + i, sW, 3);
+            }
+            tCtx.strokeStyle = bord; tCtx.lineWidth = 1;
+            tCtx.strokeRect(lX + 0.5, lY + 22 + 0.5, sW - 1, sH - 1);
+
+            // Tick labels every 20 dB
+            tCtx.fillStyle = t2;
+            tCtx.font = '400 18px "JetBrains Mono", monospace';
+            tCtx.textBaseline = 'middle';
+            for (let db = 30; db <= 130; db += 20) {
+                const y = lY + 22 + sH - ((db - 30) / 100) * sH;
+                tCtx.beginPath();
+                tCtx.moveTo(lX + sW, y); tCtx.lineTo(lX + sW + 4, y);
+                tCtx.strokeStyle = bord; tCtx.stroke();
+                tCtx.fillText(db, lX + sW + 8, y);
+            }
+            tCtx.textBaseline = 'alphabetic';
+        }
+
+        // ── CALIBRATION BAR (bottom-right of map area) ──────────────────
+        {
+            const bPad = 48;
+            const barW = Math.max(60, Math.round(10 * state.doc.scale * factor));
+            const barH = 10;
+            const bX   = eW - barW - bPad;
+            const bY   = hH + mapH - bPad - barH - 32;
+            const segs = 5, segW = barW / segs;
+
+            for (let i = 0; i < segs; i++) {
+                tCtx.fillStyle = i % 2 === 0 ? t1 : surf;
+                tCtx.fillRect(bX + i * segW, bY, segW, barH);
+            }
+            tCtx.strokeStyle = t1; tCtx.lineWidth = 1.5;
+            tCtx.strokeRect(bX + 0.5, bY + 0.5, barW - 1, barH - 1);
+
+            // End caps
+            tCtx.beginPath();
+            tCtx.moveTo(bX + 0.5,        bY - 4); tCtx.lineTo(bX + 0.5,        bY + barH + 4);
+            tCtx.moveTo(bX + barW - 0.5, bY - 4); tCtx.lineTo(bX + barW - 0.5, bY + barH + 4);
+            tCtx.stroke();
+
+            tCtx.fillStyle = t2;
+            tCtx.font = '400 22px "JetBrains Mono", monospace';
+            tCtx.textAlign = 'center'; tCtx.textBaseline = 'top';
+            tCtx.fillText('0', bX, bY + barH + 8);
+            tCtx.fillText('10 m', bX + barW, bY + barH + 8);
+            tCtx.textAlign = 'start'; tCtx.textBaseline = 'alphabetic';
+        }
+
+        // ── FOOTER: SPEAKERS (left) + ZONES (right) ──────────────────────
+        if (hasTable) {
+            const tY   = hH + mapH;
+            const divX = 1150;  // x position of vertical divider
+
+            // Panel background + accent top border
             tCtx.fillStyle = surf;
             tCtx.fillRect(0, tY, eW, tH);
             tCtx.fillStyle = acc;
-            tCtx.fillRect(0, tY, eW, 3);  // accent top border
+            tCtx.fillRect(0, tY, eW, 3);
 
-            // Column x positions
-            const cDot  = pad;
-            const cName = pad + 44;
-            const cMat  = cName + 680;
-            const cH    = eW - 860;
-            const cAbs  = eW - 660;
-            const cRefl = eW - 460;
-            const cSpl  = eW - pad;   // right-aligned
+            // Vertical divider
+            tCtx.fillStyle = bord;
+            tCtx.fillRect(divX, tY + 14, 1, tH - 28);
 
-            // Header row
+            const thY = tY + tHeadH / 2;
+
+            // ── SPEAKERS (left panel) ─────────────────────────────────────
+            // Column x positions — values right-aligned for clean numeric column
+            const cSLabel  = pad;
+            const cSSpl    = 440;
+            const cSBeam   = 650;
+            const cSBias   = 860;
+            const cSHeight = 1080;
+
             tCtx.fillStyle = t3;
             tCtx.font = '600 19px Inter, sans-serif';
             tCtx.textBaseline = 'middle';
-            const thY = tY + tHeadH / 2;
+            tCtx.fillText('SPEAKER', cSLabel, thY);
+            tCtx.textAlign = 'right';
+            [['PEAK SPL', cSSpl], ['BEAM', cSBeam], ['BASS BIAS', cSBias], ['HEIGHT', cSHeight]].forEach(([txt, x]) => {
+                tCtx.fillText(txt, x, thY);
+            });
+            tCtx.textAlign = 'start';
+
+            tCtx.fillStyle = bord;
+            tCtx.fillRect(pad, tY + tHeadH - 1, divX - pad - 20, 1);
+
+            sources.forEach((s, i) => {
+                const ry = tY + tHeadH + i * tRowH + tRowH / 2;
+                if (i % 2 === 0) {
+                    tCtx.fillStyle = bg;
+                    tCtx.fillRect(0, tY + tHeadH + i * tRowH, divX - 1, tRowH);
+                }
+                tCtx.textBaseline = 'middle';
+
+                // Numbered badge
+                tCtx.beginPath();
+                tCtx.arc(pad + 14, ry, 13, 0, Math.PI * 2);
+                tCtx.fillStyle = acc;
+                tCtx.fill();
+                tCtx.fillStyle = bg;
+                tCtx.font = 'bold 14px Inter, sans-serif';
+                tCtx.textAlign = 'center';
+                tCtx.fillText(i + 1, pad + 14, ry);
+                tCtx.textAlign = 'start';
+
+                tCtx.fillStyle = t1;
+                tCtx.font = '500 22px Inter, sans-serif';
+                tCtx.fillText(`SPK ${i + 1}`, pad + 36, ry);
+
+                tCtx.textAlign = 'right';
+                tCtx.font = '500 22px "JetBrains Mono", monospace';
+                tCtx.fillStyle = t1;
+                tCtx.fillText(`${s.db} dB`, cSSpl, ry);
+                tCtx.fillStyle = t2;
+                tCtx.fillText(`${s.beam}°`, cSBeam, ry);
+                tCtx.fillText(`${s.bassBias}`, cSBias, ry);
+                tCtx.fillText(`${s.vHeight} m`, cSHeight, ry);
+                tCtx.textAlign = 'start';
+            });
+
+            // ── ZONES (right panel) ───────────────────────────────────────
+            const zOff = divX + 30;
+            const cDot  = zOff;
+            const cName = zOff + 44;
+            const cMat  = zOff + 560;
+            const cH    = eW - 760;
+            const cAbs  = eW - 560;
+            const cRefl = eW - 360;
+            const cSpl  = eW - pad;
+
+            tCtx.fillStyle = t3;
+            tCtx.font = '600 19px Inter, sans-serif';
+            tCtx.textBaseline = 'middle';
             [['ZONE', cName], ['MATERIAL', cMat], ['H (m)', cH], ['ABSORB', cAbs], ['REFLECT', cRefl]].forEach(([txt, x]) => {
                 tCtx.fillText(txt, x, thY);
             });
@@ -2094,24 +2271,20 @@
             tCtx.fillText('EST. SPL', cSpl, thY);
             tCtx.textAlign = 'start';
 
-            // Header divider
             tCtx.fillStyle = bord;
-            tCtx.fillRect(pad, tY + tHeadH - 1, eW - pad * 2, 1);
+            tCtx.fillRect(zOff, tY + tHeadH - 1, eW - zOff - pad, 1);
 
-            // Zone rows
             zones.forEach((o, i) => {
-                const ry        = tY + tHeadH + i * tRowH + tRowH / 2;
-                const isCanopy  = MATERIAL_PRESETS[o.material]?.type === 'canopy';
-                const dbV       = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
-                const cfg       = ZONE_CONFIG[o.type] || {};
+                const ry       = tY + tHeadH + i * tRowH + tRowH / 2;
+                const isCanopy = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+                const dbV      = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                const cfg      = ZONE_CONFIG[o.type] || {};
 
-                // Alternating row tint
                 if (i % 2 === 0) {
                     tCtx.fillStyle = bg;
-                    tCtx.fillRect(0, tY + tHeadH + i * tRowH, eW, tRowH);
+                    tCtx.fillRect(divX + 1, tY + tHeadH + i * tRowH, eW - divX - 1, tRowH);
                 }
 
-                // Colour dot
                 tCtx.beginPath();
                 tCtx.arc(cDot + 10, ry, 9, 0, Math.PI * 2);
                 tCtx.fillStyle = cfg.color || t3;
@@ -2119,24 +2292,20 @@
 
                 tCtx.textBaseline = 'middle';
 
-                // Label
                 tCtx.fillStyle = t1;
                 tCtx.font = '500 22px Inter, sans-serif';
                 tCtx.fillText(o.label, cName, ry);
 
-                // Material
                 tCtx.fillStyle = isCanopy ? t3 : t2;
                 tCtx.font = '400 20px Inter, sans-serif';
                 tCtx.fillText(isCanopy ? 'pass-through' : o.material, cMat, ry);
 
-                // Numeric columns
                 tCtx.fillStyle = t2;
                 tCtx.font = '400 20px "JetBrains Mono", monospace';
                 tCtx.fillText(`${o.vHeight}`, cH, ry);
                 tCtx.fillText(`${o.absorption}`, cAbs, ry);
                 tCtx.fillText(`${o.reflection ?? '—'}`, cRefl, ry);
 
-                // SPL (right-aligned)
                 tCtx.textAlign = 'right';
                 if (isCanopy) {
                     tCtx.fillStyle = t3;
