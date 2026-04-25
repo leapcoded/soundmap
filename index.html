@@ -443,6 +443,16 @@
                         </div>
 
                         <div>
+                            <label class="field-label">Frequency band</label>
+                            <select id="bandSelect" class="select">
+                                <option value="broadband">Broadband</option>
+                                <option value="low">Low (125 Hz)</option>
+                                <option value="mid">Mid (1 kHz)</option>
+                                <option value="high">High (4 kHz)</option>
+                            </select>
+                        </div>
+
+                        <div>
                             <label class="field-label">Ground surface</label>
                             <select id="groundType" class="select">
                                 <option value="grass">Soft grass</option>
@@ -544,6 +554,10 @@
         compact:  1.0,
         concrete: 0.7
     };
+
+    // Per-band multipliers: low freq absorbed/blocked less; high freq absorbed/blocked more
+    const BAND_ABS_SCALE   = { low: 0.6, mid: 1.0, high: 1.4 };
+    const BAND_BLOCK_SCALE = { low: 0.75, mid: 1.0, high: 1.2 };
 
     const MATERIAL_PRESETS = {
         open:           { label: "Air / Open Space",          abs: 1,  blocking: 0.05, type: 'vol' },
@@ -668,7 +682,8 @@
             groundType: 'compact',
             windSpeed: 0,
             windDir: 0,
-            scheme: 'violet'
+            scheme: 'violet',
+            band: 'broadband'
         },
         ui: {
             mode: 'source',
@@ -798,11 +813,36 @@
         return false;
     }
 
-    function calculateIntensity(s, tx, ty, obstacles) {
+    // Per-source band output — bassBias skews energy between frequency bands
+    function getSourceBandDb(source, band) {
+        const low  = 0.15 + (source.bassBias / 100) * 0.35;  // 0.15–0.50
+        const high = 0.20 + (1 - source.bassBias / 100) * 0.30; // 0.20–0.50
+        const mid  = Math.max(0.01, 1 - low - high);
+        const weight = band === 'low' ? low : band === 'high' ? high : mid;
+        return source.db + 10 * Math.log10(Math.max(weight, 0.001));
+    }
+
+    // Air absorption increases sharply with frequency
+    function getAirAbsorption(band) {
+        if (band === 'high') return 0.9;
+        if (band === 'mid')  return 0.45;
+        if (band === 'low')  return 0.2;
+        return 0;
+    }
+
+    function calculateIntensity(s, tx, ty, obstacles, band) {
+        // Broadband = sum of three bands
+        if (band === 'broadband') {
+            return ['low', 'mid', 'high'].reduce(
+                (sum, b) => sum + calculateIntensity(s, tx, ty, obstacles, b), 0
+            );
+        }
+
         const { scale, windSpeed, windDir } = state.doc;
         const gf = groundFactor();
         const distM = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
-        let db = s.db - (20 * gf * Math.log10(distM));
+        let db = getSourceBandDb(s, band) - (20 * gf * Math.log10(distM));
+        db -= getAirAbsorption(band) * distM / 50;
 
         if (windSpeed > 0) {
             const aP = Math.atan2(ty - s.y, tx - s.x);
@@ -817,6 +857,9 @@
             if (diff > s.beam / 2) db -= ATTENUATION_OFF_AXIS;
         }
 
+        const absScale   = BAND_ABS_SCALE[band]   ?? 1.0;
+        const blockScale = BAND_BLOCK_SCALE[band]  ?? 1.0;
+
         for (const o of obstacles) {
             const m = MATERIAL_PRESETS[o.material];
             if (m.type === 'canopy') continue;
@@ -828,15 +871,19 @@
             const iL = getIntersectionLength(s.x, s.y, tx, ty, o);
             if (iL <= 0) continue;
 
-            const bass = 1 - (s.bassBias / 120);
             const diffra = s.vHeight > o.vHeight
                 ? Math.max(0.2, 1 - (s.vHeight - o.vHeight) / 3)
                 : 1.0;
 
+            // absorption (0–100) governs transmission loss through thin surfaces
+            // reflection (0–100) governs blocking by tall barriers
+            const absVal   = Math.min(1.5, (o.absorption   / 100) * absScale);
+            const blockVal = Math.min(1.0, (o.reflection   / 100) * blockScale);
+
             if (o.vHeight > 0.5) {
-                db -= Math.min(22, o.vHeight * 6) * m.blocking * bass * diffra;
+                db -= Math.min(22, o.vHeight * 6) * blockVal * diffra;
             } else {
-                db -= ((iL / scale) * (o.absorption / 10)) * bass;
+                db -= (iL / scale) * absVal * 10;
             }
         }
 
@@ -844,20 +891,25 @@
     }
 
     function calculateTotalDb(x, y) {
+        const band = state.doc.band ?? 'broadband';
         const items = state.doc.items;
         const sources = items.filter(i => i.type === 'source');
         const obstacles = items.filter(i => i.type !== 'source');
         let total = 0;
 
         for (const s of sources) {
-            total += calculateIntensity(s, x, y, obstacles);
+            total += calculateIntensity(s, x, y, obstacles, band);
+
+            // Reflections — only from surfaces with meaningful reflection coefficient
             for (const o of obstacles) {
                 const m = MATERIAL_PRESETS[o.material];
-                if (m.type === 'vol' || m.blocking <= 0.3) continue;
+                if (m.type === 'vol' || (o.reflection ?? 0) < 30) continue;
                 const imgS = getMirroredPoint(s.x, s.y, o);
                 const distM = Math.max(0.1, Math.hypot(imgS.x - x, imgS.y - y) / state.doc.scale);
-                const loss = -10 * Math.log10(1 - (Math.min(99, o.absorption) / 100));
-                const db = s.db - (20 * distM) - loss;
+                const reflCoeff = Math.min(0.99, o.reflection / 100);
+                const reflLoss = -10 * Math.log10(1 - reflCoeff);
+                const srcDb = (band === 'broadband') ? s.db : getSourceBandDb(s, band);
+                const db = srcDb - (20 * distM) - reflLoss;
                 if (isReflectionValid(s, { x, y }, o)) {
                     total += Math.pow(10, db / 10);
                 }
@@ -900,7 +952,8 @@
             vHeight: cfg.vH,
             label: cfg.label,
             material: cfg.material,
-            absorption: MATERIAL_PRESETS[cfg.material].abs
+            absorption: MATERIAL_PRESETS[cfg.material].abs,
+            reflection:  Math.round(MATERIAL_PRESETS[cfg.material].blocking * 100)
         };
     }
 
@@ -1361,6 +1414,7 @@
         sel.addEventListener('change', () => {
             item.material = sel.value;
             item.absorption = MATERIAL_PRESETS[sel.value].abs;
+            item.reflection  = Math.round(MATERIAL_PRESETS[sel.value].blocking * 100);
             markDirty('canvas', 'heatmap');
         });
         wrap.appendChild(sel);
@@ -1409,6 +1463,12 @@
             grid.appendChild(numberField(item, 'vHeight', 'H (m)'));
             container.appendChild(grid);
             container.appendChild(materialField(item));
+
+            // Per-item acoustic sliders — override the material preset defaults
+            const absReflGrid = el('div', 'flex flex-col gap-3');
+            absReflGrid.appendChild(sliderField(item, 'absorption', 'Absorption (0–100)', 0, 100));
+            absReflGrid.appendChild(sliderField(item, 'reflection',  'Reflection (0–100)', 0, 100));
+            container.appendChild(absReflGrid);
         }
 
         container.appendChild(sliderField(item, 'angle', 'Rotation (°)', 0, 359));
@@ -1603,7 +1663,8 @@
                     groundType: parsed.groundType ?? 'compact',
                     windSpeed: parsed.windSpeed ?? 0,
                     windDir: parsed.windDir ?? 0,
-                    scheme: parsed.scheme ?? parsed.currentScheme ?? 'violet'
+                    scheme: parsed.scheme ?? parsed.currentScheme ?? 'violet',
+                    band:   parsed.band   ?? 'broadband'
                 };
                 state.ui.selectedId = null;
                 syncGlobalInputs();
@@ -1727,7 +1788,8 @@
         document.getElementById('windSpeedInput').value = state.doc.windSpeed;
         document.getElementById('windDirInput').value = state.doc.windDir;
         document.getElementById('schemeSelect').value = state.doc.scheme;
-        document.getElementById('groundType').value = state.doc.groundType;
+        document.getElementById('bandSelect').value   = state.doc.band ?? 'broadband';
+        document.getElementById('groundType').value   = state.doc.groundType;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1803,7 +1865,8 @@
         bindPairedInput('windSpeedInput', null, 'windSpeed', parseFloat);
         bindPairedInput('windDirInput', null, 'windDir', parseFloat);
         bindSelect('schemeSelect', 'scheme');
-        bindSelect('groundType', 'groundType');
+        bindSelect('bandSelect',   'band');
+        bindSelect('groundType',   'groundType');
 
         document.getElementById('clearBtn').addEventListener('click', () => {
             pushHistory();
