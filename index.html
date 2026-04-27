@@ -2099,44 +2099,84 @@
                 let newX = pos.x - state.ui.dragOffset.x;
                 let newY = pos.y - state.ui.dragOffset.y;
 
-                if (!e.shiftKey && sel.type !== 'source' && sel.angle === 0) {
+                if (!e.shiftKey && sel.type !== 'source') {
                     const snapDist = 15 / state.ui.zoom;
-                    const w1 = sel.w || 0, h1 = sel.h || 0;
-                    const l1 = newX - w1/2, r1 = newX + w1/2, t1 = newY - h1/2, b1 = newY + h1/2;
+                    
+                    let snapDx = 0, snapDy = 0;
+                    let bestX = snapDist, bestY = snapDist;
+                    
+                    let ptSnapDx = 0, ptSnapDy = 0;
+                    let bestPt = snapDist;
+                    let hasPtSnap = false;
 
-                    let snapX = null, snapY = null;
-                    let minDx = snapDist, minDy = snapDist;
+                    const getPoints = (cx, cy, w, h, angle) => {
+                        const rad = angle * Math.PI / 180;
+                        const cos = Math.cos(rad), sin = Math.sin(rad);
+                        const hw = w / 2, hh = h / 2;
+                        return [
+                            { x: cx, y: cy },
+                            { x: cx + hw * cos - hh * sin, y: cy + hw * sin + hh * cos },
+                            { x: cx - hw * cos - hh * sin, y: cy - hw * sin + hh * cos },
+                            { x: cx - hw * cos + hh * sin, y: cy - hw * sin - hh * cos },
+                            { x: cx + hw * cos + hh * sin, y: cy + hw * sin - hh * cos },
+                            { x: cx + hw * cos, y: cy + hw * sin },
+                            { x: cx - hw * cos, y: cy - hw * sin },
+                            { x: cx - hh * sin, y: cy + hh * cos },
+                            { x: cx + hh * sin, y: cy - hh * cos }
+                        ];
+                    };
 
                     for (const other of state.doc.items) {
-                        if (other.id === sel.id || other.type === 'source' || other.angle !== 0) continue;
-                        const w2 = other.w || 0, h2 = other.h || 0;
-                        const l2 = other.x - w2/2, r2 = other.x + w2/2, t2 = other.y - h2/2, b2 = other.y + h2/2;
+                        if (other.id === sel.id || other.type === 'source') continue;
 
-                        const xChecks = [
-                            { dx: Math.abs(l1 - l2), snapTo: l2 + w1/2 },
-                            { dx: Math.abs(l1 - r2), snapTo: r2 + w1/2 },
-                            { dx: Math.abs(r1 - l2), snapTo: l2 - w1/2 },
-                            { dx: Math.abs(r1 - r2), snapTo: r2 - w1/2 },
-                            { dx: Math.abs(newX - other.x), snapTo: other.x }
-                        ];
-                        for (const c of xChecks) {
-                            if (c.dx < minDx) { minDx = c.dx; snapX = c.snapTo; }
+                        const w1 = sel.w || 0, h1 = sel.h || 0;
+                        const w2 = other.w || 0, h2 = other.h || 0;
+
+                        // Orthogonal edge snapping
+                        if (sel.angle % 90 === 0 && other.angle % 90 === 0) {
+                            const ew1 = sel.angle % 180 === 0 ? w1 : h1;
+                            const eh1 = sel.angle % 180 === 0 ? h1 : w1;
+                            const ew2 = other.angle % 180 === 0 ? w2 : h2;
+                            const eh2 = other.angle % 180 === 0 ? h2 : w2;
+
+                            const xs = [other.x - ew2/2 + ew1/2, other.x + ew2/2 - ew1/2, other.x - ew2/2 - ew1/2, other.x + ew2/2 + ew1/2, other.x];
+                            const ys = [other.y - eh2/2 + eh1/2, other.y + eh2/2 - eh1/2, other.y - eh2/2 - eh1/2, other.y + eh2/2 + eh1/2, other.y];
+
+                            for (const sx of xs) {
+                                const d = Math.abs(sx - newX);
+                                if (d < bestX) { bestX = d; snapDx = sx - newX; }
+                            }
+                            for (const sy of ys) {
+                                const d = Math.abs(sy - newY);
+                                if (d < bestY) { bestY = d; snapDy = sy - newY; }
+                            }
                         }
 
-                        const yChecks = [
-                            { dy: Math.abs(t1 - t2), snapTo: t2 + h1/2 },
-                            { dy: Math.abs(t1 - b2), snapTo: b2 + h1/2 },
-                            { dy: Math.abs(b1 - t2), snapTo: t2 - h1/2 },
-                            { dy: Math.abs(b1 - b2), snapTo: b2 - h1/2 },
-                            { dy: Math.abs(newY - other.y), snapTo: other.y }
-                        ];
-                        for (const c of yChecks) {
-                            if (c.dy < minDy) { minDy = c.dy; snapY = c.snapTo; }
+                        // Universal point snapping (handles corners and midpoints of ANY rotation)
+                        const pts1 = getPoints(newX, newY, w1, h1, sel.angle);
+                        const pts2 = getPoints(other.x, other.y, w2, h2, other.angle);
+
+                        for (const p1 of pts1) {
+                            for (const p2 of pts2) {
+                                const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                                if (dist < bestPt) {
+                                    bestPt = dist;
+                                    ptSnapDx = p2.x - p1.x;
+                                    ptSnapDy = p2.y - p1.y;
+                                    hasPtSnap = true;
+                                }
+                            }
                         }
                     }
 
-                    if (snapX !== null) newX = snapX;
-                    if (snapY !== null) newY = snapY;
+                    // Apply the best snap available
+                    if (hasPtSnap && bestPt <= Math.min(bestX, bestY)) {
+                        newX += ptSnapDx;
+                        newY += ptSnapDy;
+                    } else {
+                        if (bestX < snapDist) newX += snapDx;
+                        if (bestY < snapDist) newY += snapDy;
+                    }
                 }
 
                 sel.x = newX;
