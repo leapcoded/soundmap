@@ -2199,8 +2199,12 @@
             156543.03392 * Math.cos(lat0 * Math.PI / 180) / exportMPP
         );
         const tileZoom     = Math.min(19, Math.max(14, Math.round(idealZoom)));
-        const tileMPP      = 156543.03392 * Math.cos(lat0 * Math.PI / 180) / Math.pow(2, tileZoom);
-        const tileExportSz = 256 * tileMPP / exportMPP;          // export px per tile
+        // Tile size in export pixels — must use the Mercator tile width
+        // (2πR / 2^z metres) to match llToWorld() which operates in Mercator metres.
+        // The geographic formula 156543×cos(lat) gives a different (smaller) value
+        // because it accounts for Mercator stretching; using it here causes gaps.
+        const mercatorTileWidth = (2 * Math.PI * 6378137) / Math.pow(2, tileZoom);
+        const tileExportSz      = mercatorTileWidth / metersPerWorldPx * factor;
 
         // Lat/lng → integer tile coords at zoom z
         function llToTileXY(ll, z) {
