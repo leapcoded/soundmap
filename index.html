@@ -1234,9 +1234,10 @@
                 }
                 const label = o.label || (o.type === 'source' ? `Speaker ${sources.indexOf(o) + 1}` : (ZONE_CONFIG[o.type]?.label || o.type));
                 const iconColor = o.type === 'source' ? canvasColors.accent : (o.customColor ?? ZONE_CONFIG[o.type]?.color ?? canvasColors.text3);
+                const br = o.type === 'source' ? '50%' : '2px';
 
                 html += `<div data-id="${o.id}" class="sched-row" style="display:flex;align-items:center;padding:8px 16px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);${bg} transition:background 0.1s;">
-                    <div style="width:12px;height:12px;border-radius:50%;background:${iconColor};margin-right:12px;"></div>
+                    <div style="width:12px;height:12px;border-radius:${br};background:${iconColor};margin-right:12px;"></div>
                     <div style="flex:1;${color}">${label}</div>
                     <div style="width:100px;color:var(--text-2);font-size:10px;">${typeText}</div>
                     <div class="mono" style="width:60px;text-align:right;color:${(splText !== '—' && parseInt(splText) > 85) ? 'var(--accent)' : 'var(--text-1)'};">${splText}</div>
@@ -1363,7 +1364,7 @@
             ctx.font = 'bold 12px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(indexNum, 0, 0);
+            ctx.fillText(indexNum, 0, 1);
             ctx.restore();
 
             ctx.beginPath();
@@ -1408,40 +1409,39 @@
             ctx.lineWidth = sel ? 2 : (item.isExclusion ? 1.75 : 1.25);
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-            const isExcl = item.isExclusion;
-            const dbV = isExcl ? null : calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
-            const dbStr = dbV != null ? `${Math.round(dbV)} dB` : 'exclusion';
+            if (sel) {
+                const cs = 6;
+                ctx.strokeStyle = canvasColors.accent;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-w/2, -h/2 + cs); ctx.lineTo(-w/2, -h/2); ctx.lineTo(-w/2 + cs, -h/2);
+                ctx.moveTo(w/2 - cs, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2, -h/2 + cs);
+                ctx.moveTo(w/2, h/2 - cs); ctx.lineTo(w/2, h/2); ctx.lineTo(w/2 - cs, h/2);
+                ctx.moveTo(-w/2 + cs, h/2); ctx.lineTo(-w/2, h/2); ctx.lineTo(-w/2, h/2 - cs);
+                ctx.stroke();
+            }
 
             ctx.save();
             ctx.rotate(-item.angle * Math.PI / 180);
             
-            const badgeR = 11;
-            ctx.beginPath();
-            ctx.arc(0, 0, badgeR, 0, Math.PI * 2);
+            const badgeSz = 22;
             ctx.fillStyle = zoneColor;
             ctx.globalAlpha = 0.92;
-            ctx.fill();
+            if (ctx.roundRect) {
+                ctx.beginPath();
+                ctx.roundRect(-badgeSz/2, -badgeSz/2, badgeSz, badgeSz, 3);
+                ctx.fill();
+            } else {
+                ctx.fillRect(-badgeSz/2, -badgeSz/2, badgeSz, badgeSz);
+            }
             ctx.globalAlpha = 1.0;
             
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 12px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(indexNum, 0, 0);
+            ctx.fillText(indexNum, 0, 1);
 
-            if (!isExcl && h > 32 && w > 60) {
-                ctx.font = '500 11px "JetBrains Mono"';
-                const tw = ctx.measureText(dbStr).width;
-                ctx.fillStyle = canvasColors.surface;
-                ctx.globalAlpha = 0.8;
-                ctx.fillRect(-tw/2 - 4, badgeR + 4, tw + 8, 16);
-                ctx.globalAlpha = 1.0;
-                
-                ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
-                ctx.textBaseline = 'middle';
-                ctx.fillText(dbStr, 0, badgeR + 12);
-            }
-            
             ctx.restore();
         }
 
@@ -1459,18 +1459,6 @@
             ctx.arc(0, rhY, 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-
-            if (item.type !== 'source') {
-                const hs = 4;
-                const corners = [
-                    {x: -w/2, y: -h/2}, {x: w/2, y: -h/2},
-                    {x: w/2, y: h/2}, {x: -w/2, y: h/2}
-                ];
-                corners.forEach(c => {
-                    ctx.fillRect(c.x - hs, c.y - hs, hs*2, hs*2);
-                    ctx.strokeRect(c.x - hs, c.y - hs, hs*2, hs*2);
-                });
-            }
         }
         ctx.restore();
     }
@@ -1898,6 +1886,35 @@
             return;
         }
 
+        // Check if clicking on the schedule list
+        const sources = state.doc.items.filter(i => i.type === 'source');
+        const zones = state.doc.items.filter(i => i.type !== 'source');
+        const allItems = [...sources, ...zones];
+        
+        if (allItems.length > 0) {
+            const panelW = 300;
+            const pad = 16;
+            const panelX = state.ui.width - panelW - pad;
+            
+            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
+                const headerH = 32;
+                const panelH = headerH + (allItems.length * 22) + 12;
+                
+                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
+                    const localY = screenPos.y - pad - headerH - 6;
+                    const rowIndex = Math.floor(localY / 22);
+                    
+                    if (rowIndex >= 0 && rowIndex < allItems.length) {
+                        const clickedItem = allItems[rowIndex];
+                        state.ui.selectedId = clickedItem.id;
+                        setMode('select'); // Switch tools automatically
+                        markDirty('canvas', 'inspector');
+                        return; // Stop further handling so it doesn't drop items behind the menu
+                    }
+                }
+            }
+        }
+
         if (mode === 'ruler') {
             state.ui.rulerStart = pos;
             state.ui.rulerEnd = pos;
@@ -1979,7 +1996,33 @@
             return;
         }
 
-        canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
+        let isHoveringList = false;
+        const sources = state.doc.items.filter(i => i.type === 'source');
+        const zones = state.doc.items.filter(i => i.type !== 'source');
+        const allItems = [...sources, ...zones];
+
+        if (allItems.length > 0) {
+            const panelW = 300;
+            const pad = 16;
+            const panelX = state.ui.width - panelW - pad;
+            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
+                const headerH = 32;
+                const panelH = headerH + (allItems.length * 22) + 12;
+                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
+                    const localY = screenPos.y - pad - headerH - 6;
+                    const rowIndex = Math.floor(localY / 22);
+                    if (rowIndex >= 0 && rowIndex < allItems.length) {
+                        isHoveringList = true;
+                    }
+                }
+            }
+        }
+
+        if (isHoveringList) {
+            canvas.style.cursor = 'pointer';
+        } else {
+            canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
+        }
 
         const pos = screenToWorld(screenPos.x, screenPos.y);
         document.getElementById('xyDisplay').textContent =
@@ -2367,6 +2410,7 @@
             tCtx.globalAlpha = 1.0;
         }
 
+        // Draw heat map onto an off-screen canvas to blur correctly
         const hC = document.createElement('canvas');
         hC.width = eW; hC.height = mapH;
         const hCtx = hC.getContext('2d');
@@ -2386,7 +2430,7 @@
 
         tCtx.save();
         tCtx.globalAlpha = state.doc.heatmapOpacity / 100;
-        tCtx.filter = `blur(${EXPORT_HEATMAP_STEP * 4}px)`;
+        tCtx.filter = `blur(${EXPORT_HEATMAP_STEP * 3}px)`;
         tCtx.drawImage(hC, 0, hH);
         tCtx.restore();
 
@@ -2419,20 +2463,7 @@
                 tCtx.font = 'bold 15px Inter, sans-serif';
                 tCtx.textAlign = 'center';
                 tCtx.textBaseline = 'middle';
-                tCtx.fillText(srcNum, 0, 0);
-
-                if (item.label) {
-                    tCtx.font = '600 20px Inter, sans-serif';
-                    const tw = tCtx.measureText(item.label).width;
-                    const ph = 30, pPad = 12, labelY = -36;
-                    tCtx.fillStyle = surf;
-                    tCtx.fillRect(-tw / 2 - pPad, labelY - ph + 8, tw + pPad * 2, ph);
-                    tCtx.lineWidth = 1;
-                    tCtx.strokeStyle = bord;
-                    tCtx.strokeRect(-tw / 2 - pPad, labelY - ph + 8, tw + pPad * 2, ph);
-                    tCtx.fillStyle = t1;
-                    tCtx.fillText(item.label, 0, labelY);
-                }
+                tCtx.fillText(srcNum, 0, 1.5);
 
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
@@ -2464,22 +2495,26 @@
                 tCtx.setLineDash([]);
 
                 const zoneNum = zones.indexOf(item) + 1;
-                const badgeR  = 18;
-                const bx = w > badgeR * 4 ? -w/2 + badgeR + 10 : 0;
-                const by = h > badgeR * 4 ? -h/2 + badgeR + 10 : 0;
+                const badgeSz  = 36;
+                const bx = w > badgeSz * 2 ? -w/2 + badgeSz/2 + 12 : 0;
+                const by = h > badgeSz * 2 ? -h/2 + badgeSz/2 + 12 : 0;
 
-                tCtx.beginPath();
-                tCtx.arc(bx, by, badgeR, 0, Math.PI * 2);
                 tCtx.fillStyle = zoneColor;
-                tCtx.globalAlpha = 0.92;
-                tCtx.fill();
+                tCtx.globalAlpha = 0.95;
+                if (tCtx.roundRect) {
+                    tCtx.beginPath();
+                    tCtx.roundRect(bx - badgeSz/2, by - badgeSz/2, badgeSz, badgeSz, 4);
+                    tCtx.fill();
+                } else {
+                    tCtx.fillRect(bx - badgeSz/2, by - badgeSz/2, badgeSz, badgeSz);
+                }
                 tCtx.globalAlpha = 1.0;
 
                 tCtx.fillStyle = '#ffffff';
-                tCtx.font = 'bold 16px Inter, sans-serif';
+                tCtx.font = 'bold 18px Inter, sans-serif';
                 tCtx.textAlign = 'center';
                 tCtx.textBaseline = 'middle';
-                tCtx.fillText(zoneNum, bx, by);
+                tCtx.fillText(zoneNum, bx, by + 1.5);
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
             }
@@ -2658,10 +2693,16 @@
                     tCtx.fillRect(divX + 1, tY + tHeadH + i * tRowH, eW - divX - 1, tRowH);
                 }
 
-                tCtx.beginPath();
-                tCtx.arc(cDot + 14, ry, 13, 0, Math.PI * 2);
+                const zSz = 26;
                 tCtx.fillStyle = zoneColor;
-                tCtx.fill();
+                if (tCtx.roundRect) {
+                    tCtx.beginPath();
+                    tCtx.roundRect(cDot + 14 - zSz/2, ry - zSz/2, zSz, zSz, 3);
+                    tCtx.fill();
+                } else {
+                    tCtx.fillRect(cDot + 14 - zSz/2, ry - zSz/2, zSz, zSz);
+                }
+                
                 tCtx.fillStyle = '#ffffff';
                 tCtx.font = 'bold 14px Inter, sans-serif';
                 tCtx.textAlign = 'center';
@@ -3170,7 +3211,7 @@
                 <p class="help-p">Set scale before placing anything — it cannot be changed without manually repositioning all items.</p>
                 <p class="help-p">Upload your site map and lower the Map Opacity slider until the heatmap colours read clearly through it.</p>
                 <p class="help-p">Place speakers first, then add zones to see SPL readings in context. The schedule panel updates in real time as you drag elements.</p>
-                <p class="help-p">Low band (125 Hz) is almost always the compliance concern. Check this view for camping areas and residential boundaries near the site.</p>
+                <p class="help-p">Low band (125 Hz) is almost always the compliance concern. Check this view for camping areas and any residential boundaries near the site.</p>
                 <p class="help-p">Save the project JSON at the end of each session — it preserves all placements, settings, and event details for the next review or handoff.</p>
             </div>
         </div>
