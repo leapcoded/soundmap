@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acoustic Site Planner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -456,6 +458,9 @@
             <button id="themeBtn" class="btn btn-ghost btn-icon" title="Toggle theme">
                 <svg id="themeIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
             </button>
+            <button id="satelliteBtn" class="btn btn-ghost btn-icon" title="Satellite map (Esri / Leaflet)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><use href="#i-satellite"/></svg>
+            </button>
             <button id="helpBtn" class="btn btn-ghost btn-icon" title="How to use">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </button>
@@ -564,6 +569,19 @@
                     <div class="grid grid-cols-3 gap-1.5" id="zoneButtons"></div>
                 </section>
 
+                <!-- Satellite -->
+                <section id="satelliteSection" class="flex flex-col gap-3" style="display:none">
+                    <h2 class="section-label">Satellite</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="locationSearch" placeholder="Search location…" class="input flex-1" style="font-family:var(--font-ui)">
+                        <button id="locationSearchBtn" class="btn">Go</button>
+                    </div>
+                    <button id="scaleSyncBtn" class="btn w-full" style="justify-content:center;font-size:11px;">
+                        Sync scale from map zoom
+                    </button>
+                    <p style="font-size:10px;color:var(--text-3);line-height:1.5;">Navigate to your site, then place elements. Press <strong style="color:var(--text-2)">Sync scale</strong> to match item sizes to the satellite zoom level.</p>
+                </section>
+
                 <!-- Inspector -->
                 <section class="flex flex-col gap-3">
                     <h2 class="section-label">Inspector</h2>
@@ -574,9 +592,10 @@
         </aside>
 
         <!-- ═══ Canvas area ═══════════════════════════════════════════════ -->
-        <div class="flex-1 relative overflow-hidden flex items-center justify-center" style="background: var(--bg);">
-            <canvas id="mapCanvas"></canvas>
-            <div class="hud">
+        <div id="canvasWrap" class="flex-1 relative overflow-hidden" style="background: var(--bg);">
+            <div id="leafletMap" style="position:absolute;inset:0;z-index:0;display:none;"></div>
+            <canvas id="mapCanvas" style="position:absolute;inset:0;z-index:1;display:block;"></canvas>
+            <div class="hud" style="z-index:10">
                 <div class="hud-cell">
                     <span class="hud-label">Pos</span>
                     <span class="hud-value" id="xyDisplay">0, 0</span>
@@ -602,6 +621,8 @@
         <defs>
             <!-- Tool icons -->
             <symbol id="i-cursor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9.5-7 1.5-3.5 7.5L5 3z"/></symbol>
+            <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+            <symbol id="i-satellite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 15 8-8"/><path d="m8 11-2 2a4 4 0 0 0 5 5l2-2"/><path d="m11 8 2-2a4 4 0 0 1 5 5l-2 2"/><circle cx="20" cy="4" r="1"/><circle cx="4" cy="20" r="1"/><path d="M13 11h.01M11 13h.01"/></symbol>
             <symbol id="i-speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
             <symbol id="i-hay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16" x2="21" y2="16"/><line x1="9" y1="8" x2="9" y2="20"/><line x1="15" y1="8" x2="15" y2="20"/></symbol>
             <symbol id="i-fence" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/><path d="M7 4v18M12 4v18M17 4v18"/></symbol>
@@ -696,7 +717,8 @@
         toilets:      { label: 'Toilets',        color: '#8a9098', material: 'plastic',        vH: 2.5 },
         seating:      { label: 'Seating',        color: '#7da878', material: 'wood',           vH: 0.5 },
         heras_panel:  { label: 'Heras (3.5m)',   color: '#7b6d98', material: 'acoustic_heras', vH: 2   },
-        hay_bales:    { label: 'Hay bales',      color: '#b8a55a', material: 'hay',            vH: 1.5 }
+        hay_bales:    { label: 'Hay bales',      color: '#b8a55a', material: 'hay',            vH: 1.5 },
+        custom:       { label: 'Custom',         color: '#888888', material: 'open',           vH: 0   }
     };
 
     // Toolbar layout (icon = SVG symbol id)
@@ -723,7 +745,8 @@
         { mode: 'firepit',      icon: 'i-flame' },
         { mode: 'showers',      icon: 'i-shower' },
         { mode: 'toilets',      icon: 'i-wc' },
-        { mode: 'seating',      icon: 'i-chair' }
+        { mode: 'seating',      icon: 'i-chair' },
+        { mode: 'custom',       icon: 'i-grid' }
     ];
 
     // Heatmap schemes — these ARE the data visualisation, so they remain
@@ -808,7 +831,8 @@
             zoom: 1.0,
             isPanning: false,
             panAnchor: null,
-            spaceDown: false
+            spaceDown: false,
+            mapMode: false
         },
         history: { past: [], future: [] }
     };
@@ -997,6 +1021,7 @@
         for (const o of obstacles) {
             const m = MATERIAL_PRESETS[o.material];
             if (m.type === 'canopy') continue;
+            if (o.isExclusion) continue;  // exclusion zones are map markers only
             const sIn = isPointInItem(s.x, s.y, o);
             const tIn = isPointInItem(tx, ty, o);
             if (m.type === 'shell' && sIn && tIn) continue;
@@ -1068,6 +1093,7 @@
         return {
             id: Date.now() + Math.random(),
             type: 'source',
+            label: '',
             x: pos.x, y: pos.y,
             angle: 0, db: 100, beam: 90, bassBias: 50, vHeight: 4
         };
@@ -1095,7 +1121,9 @@
             label: cfg.label,
             material: cfg.material,
             absorption: MATERIAL_PRESETS[cfg.material].abs,
-            reflection:  Math.round(MATERIAL_PRESETS[cfg.material].blocking * 100)
+            reflection:  Math.round(MATERIAL_PRESETS[cfg.material].blocking * 100),
+            isExclusion: false,
+            customColor: mode === 'custom' ? '#e05c3a' : null
         };
     }
 
@@ -1108,14 +1136,32 @@
     const offscreenHeatmap = document.createElement('canvas');
     const offCtx = offscreenHeatmap.getContext('2d');
 
+    // Checkerboard pattern cache — keyed by color, created once per unique color.
+    const _checkerCache = {};
+    function makeCheckerPattern(targetCtx, color, size = 7) {
+        const key = color + size;
+        if (_checkerCache[key]) return _checkerCache[key];
+        const pc = document.createElement('canvas');
+        pc.width = pc.height = size * 2;
+        const px = pc.getContext('2d');
+        px.fillStyle = color;
+        px.globalAlpha = 0.28;
+        px.fillRect(0, 0, size, size);
+        px.fillRect(size, size, size, size);
+        const pattern = targetCtx.createPattern(pc, 'repeat');
+        _checkerCache[key] = pattern;
+        return pattern;
+    }
+
     function resize() {
-        const c = canvas.parentElement;
+        const c = document.getElementById('canvasWrap');
         state.ui.width = c.clientWidth;
         state.ui.height = c.clientHeight;
         canvas.width = state.ui.width;
         canvas.height = state.ui.height;
         offscreenHeatmap.width = state.ui.width;
         offscreenHeatmap.height = state.ui.height;
+        if (leafletMap) leafletMap.invalidateSize();
         markDirty('canvas', 'heatmap');
     }
 
@@ -1138,6 +1184,7 @@
     }
 
     function renderBackground() {
+        if (state.ui.mapMode) return;
         if (!state.ui.backgroundImage) return;
         const img = state.ui.backgroundImage;
         const { width, height } = state.ui;
@@ -1194,15 +1241,16 @@
         ctx.lineTo(panelW, headerH);
         ctx.stroke();
 
-        // Rows
         zones.forEach((o, i) => {
             const y = headerH + 6 + (i * rowH) + rowH / 2;
-            const isCanopy = MATERIAL_PRESETS[o.material]?.type === 'canopy';
-            const dbV = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+            const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+            const isExclusion = o.isExclusion;
+            const dbV = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
 
-            // Zone colour dot
+            // Zone colour dot — use customColor when set
             const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
-            ctx.fillStyle = cfg.color;
+            const zoneColor = o.customColor ?? cfg.color;
+            ctx.fillStyle = zoneColor;
             ctx.beginPath();
             ctx.arc(18, y, 3, 0, Math.PI * 2);
             ctx.fill();
@@ -1212,15 +1260,18 @@
             ctx.font = '500 11px Inter';
             ctx.fillText(o.label, 28, y);
 
-            // Material — canopy surfaces noted as pass-through
-            ctx.fillStyle = isCanopy ? canvasColors.text3 : canvasColors.text2;
+            // Material column
+            ctx.fillStyle = (isCanopy || isExclusion) ? canvasColors.text3 : canvasColors.text2;
             ctx.font = '400 10px Inter';
-            ctx.fillText(isCanopy ? 'pass-through' : o.material, 130, y);
+            ctx.fillText(
+                isExclusion ? 'exclusion' : isCanopy ? 'pass-through' : o.material,
+                130, y
+            );
 
-            // dB — suppressed for canopy (it casts no shadow, reading is misleading)
+            // SPL column
             ctx.font = '500 11px "JetBrains Mono"';
             ctx.textAlign = 'right';
-            if (isCanopy) {
+            if (isCanopy || isExclusion) {
                 ctx.fillStyle = canvasColors.text3;
                 ctx.fillText('—', panelW - 12, y);
             } else {
@@ -1421,7 +1472,6 @@
                 ctx.arc(0, 0, 14, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                // Small label above — "tent" shorthand
                 ctx.fillStyle = cc;
                 ctx.font = '500 8px Inter';
                 ctx.textAlign = 'center';
@@ -1430,16 +1480,44 @@
                 ctx.textAlign = 'start';
                 ctx.restore();
             }
+
+            // Speaker label — counter-rotated so it always reads upright.
+            // Shown above the canopy ring if present, otherwise above the dot.
+            if (item.label) {
+                ctx.save();
+                ctx.rotate(-item.angle * Math.PI / 180);
+                const labelY = canopy ? -28 : -14;
+                ctx.font = '600 9px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'alphabetic';
+                // Pill background for contrast over heatmap
+                const tw = ctx.measureText(item.label).width;
+                const ph = 11, pPad = 4;
+                ctx.fillStyle = canvasColors.surface;
+                ctx.globalAlpha = 0.85;
+                ctx.fillRect(-tw / 2 - pPad, labelY - ph + 1, tw + pPad * 2, ph);
+                ctx.globalAlpha = 1.0;
+                ctx.fillStyle = canvasColors.accent;
+                ctx.fillText(item.label, 0, labelY);
+                ctx.textAlign = 'start';
+                ctx.restore();
+            }
         } else {
             const cfg = ZONE_CONFIG[item.type] || { color: canvasColors.text3 };
+            const zoneColor = item.customColor ?? cfg.color;
 
-            // Fill (very subtle, zone colour at low opacity)
-            ctx.fillStyle = cfg.color + '1f';  // ~12% alpha
-            ctx.fillRect(-w / 2, -h / 2, w, h);
+            // Fill — checkerboard for exclusion zones, subtle tint otherwise
+            if (item.isExclusion) {
+                ctx.fillStyle = makeCheckerPattern(ctx, zoneColor);
+                ctx.fillRect(-w / 2, -h / 2, w, h);
+            } else {
+                ctx.fillStyle = zoneColor + '1f';
+                ctx.fillRect(-w / 2, -h / 2, w, h);
+            }
 
             // Border — thicker + accent when selected, otherwise zone colour
-            ctx.strokeStyle = sel ? canvasColors.accent : cfg.color;
-            ctx.lineWidth = sel ? 2 : 1.25;
+            ctx.strokeStyle = sel ? canvasColors.accent : zoneColor;
+            ctx.lineWidth = sel ? 2 : (item.isExclusion ? 1.75 : 1.25);
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
             // Corner marks (selection indicator — more CAD-like than a glow)
@@ -1461,9 +1539,10 @@
 
             // Labels — on-canvas labels are now quieter: small, no shadow,
             // consistent position (inside top-left when there's room).
-            const dbV = calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
+            const isExcl = item.isExclusion;
+            const dbV = isExcl ? null : calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
             const labelStr = item.label;
-            const dbStr = `${Math.round(dbV)} dB`;
+            const dbStr = dbV != null ? `${Math.round(dbV)} dB` : 'exclusion';
 
             if (h > 32 && w > 60) {
                 // Inside
@@ -1471,7 +1550,7 @@
                 ctx.font = '500 11px Inter';
                 ctx.fillText(labelStr, -w/2 + 6, -h/2 + 14);
                 ctx.font = '500 10px "JetBrains Mono"';
-                ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text2;
+                ctx.fillStyle = isExcl ? canvasColors.text3 : (dbV > 85 ? canvasColors.accent : canvasColors.text2);
                 ctx.fillText(dbStr, -w/2 + 6, h/2 - 6);
             } else {
                 // Outside, centred above
@@ -1704,6 +1783,7 @@
         container.appendChild(header);
 
         if (item.type === 'source') {
+            container.appendChild(textField(item, 'label', 'Label'));
             container.appendChild(sliderField(item, 'db', 'SPL (peak dB)', 60, 130));
             container.appendChild(sliderField(item, 'beam', 'Dispersion (°)', 30, 360));
             const grid = el('div', 'grid grid-cols-2 gap-2');
@@ -1721,6 +1801,49 @@
             }
         } else {
             container.appendChild(textField(item, 'label', 'Label'));
+
+            // Custom zone controls — color picker + exclusion toggle
+            if (item.type === 'custom') {
+                const row = el('div', 'grid grid-cols-2 gap-2');
+
+                // Color picker
+                const colorWrap = el('div');
+                colorWrap.appendChild(el('label', 'field-label', { text: 'Colour' }));
+                const colorInp = document.createElement('input');
+                colorInp.type = 'color';
+                colorInp.value = item.customColor ?? '#e05c3a';
+                colorInp.style.cssText = 'width:100%;height:32px;padding:2px;border:1px solid var(--border);border-radius:3px;background:var(--surface-2);cursor:pointer;';
+                colorInp.addEventListener('input', () => {
+                    item.customColor = colorInp.value;
+                    markDirty('canvas');
+                });
+                colorWrap.appendChild(colorInp);
+                row.appendChild(colorWrap);
+
+                // Exclusion toggle
+                const excWrap = el('div');
+                excWrap.appendChild(el('label', 'field-label', { text: 'Exclusion zone' }));
+                const excLabel = el('label', 'flex items-center gap-2');
+                excLabel.style.cursor = 'pointer';
+                const excInp = document.createElement('input');
+                excInp.type = 'checkbox';
+                excInp.checked = item.isExclusion ?? false;
+                excInp.style.cssText = 'width:14px;height:14px;accent-color:var(--accent);cursor:pointer;';
+                excInp.addEventListener('change', () => {
+                    item.isExclusion = excInp.checked;
+                    markDirty('canvas', 'heatmap');
+                });
+                const excText = el('span');
+                excText.textContent = 'On';
+                excText.style.cssText = 'font-size:11px;color:var(--text-2)';
+                excLabel.appendChild(excInp);
+                excLabel.appendChild(excText);
+                excWrap.appendChild(excLabel);
+                row.appendChild(excWrap);
+
+                container.appendChild(row);
+            }
+
             const grid = el('div', 'grid grid-cols-3 gap-2');
             const sc = state.doc.scale;
             const metres = { toUI: (v) => Math.round(v / sc), toStore: (v) => v * sc };
@@ -1855,10 +1978,10 @@
         if (e.button === 1 || (e.button === 0 && state.ui.spaceDown)) {
             e.preventDefault();
             state.ui.isPanning = true;
-            state.ui.panAnchor = {
-                sx: screenPos.x, sy: screenPos.y,
-                ox: state.ui.pan.x, oy: state.ui.pan.y
-            };
+            // In map mode, panning is incremental (we ask Leaflet to panBy on each move)
+            state.ui.panAnchor = state.ui.mapMode
+                ? { sx: screenPos.x, sy: screenPos.y }
+                : { sx: screenPos.x, sy: screenPos.y, ox: state.ui.pan.x, oy: state.ui.pan.y };
             canvas.style.cursor = 'grabbing';
             return;
         }
@@ -1909,9 +2032,17 @@
 
         if (state.ui.isPanning) {
             const a = state.ui.panAnchor;
-            state.ui.pan.x = a.ox + (screenPos.x - a.sx);
-            state.ui.pan.y = a.oy + (screenPos.y - a.sy);
-            markDirty('canvas', 'heatmap');
+            if (state.ui.mapMode && leafletMap) {
+                // Incremental Leaflet pan; Leaflet 'move' event will sync canvas
+                const dx = screenPos.x - a.sx;
+                const dy = screenPos.y - a.sy;
+                leafletMap.panBy([-dx, -dy], { animate: false });
+                state.ui.panAnchor = { sx: screenPos.x, sy: screenPos.y };
+            } else {
+                state.ui.pan.x = a.ox + (screenPos.x - a.sx);
+                state.ui.pan.y = a.oy + (screenPos.y - a.sy);
+                markDirty('canvas', 'heatmap');
+            }
             return;
         }
 
@@ -2139,42 +2270,79 @@
                 tCtx.textAlign = 'center';
                 tCtx.textBaseline = 'middle';
                 tCtx.fillText(srcNum, 0, 0);
+
+                // Speaker label above the dot — only when set
+                if (item.label) {
+                    tCtx.font = '600 20px Inter, sans-serif';
+                    const tw = tCtx.measureText(item.label).width;
+                    const ph = 24, pPad = 8, labelY = -34;
+                    tCtx.fillStyle = 'rgba(0,0,0,0.72)';
+                    tCtx.fillRect(-tw / 2 - pPad, labelY - ph + 4, tw + pPad * 2, ph);
+                    tCtx.fillStyle = acc;
+                    tCtx.fillText(item.label, 0, labelY);
+                }
+
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
                 tCtx.restore();
             } else {
                 const cfg      = ZONE_CONFIG[item.type] || { color: t2 };
                 const isCanopy = MATERIAL_PRESETS[item.material]?.type === 'canopy';
+                const zoneColor = item.customColor ?? cfg.color;
 
-                // Subtle zone fill (same tint as live canvas)
-                tCtx.fillStyle = cfg.color + '28';
+                // Fill — checkerboard for exclusion zones, tint otherwise
+                if (item.isExclusion) {
+                    const pc = document.createElement('canvas');
+                    const cs = 14;
+                    pc.width = pc.height = cs * 2;
+                    const px = pc.getContext('2d');
+                    px.fillStyle = zoneColor;
+                    px.globalAlpha = 0.32;
+                    px.fillRect(0, 0, cs, cs);
+                    px.fillRect(cs, cs, cs, cs);
+                    tCtx.fillStyle = tCtx.createPattern(pc, 'repeat');
+                } else {
+                    tCtx.fillStyle = zoneColor + '28';
+                }
                 tCtx.fillRect(-w/2, -h/2, w, h);
 
-                // Zone border
-                tCtx.strokeStyle = cfg.color;
-                tCtx.lineWidth = 4;
+                // Border — dashed for exclusion zones
+                tCtx.strokeStyle = zoneColor;
+                tCtx.lineWidth = item.isExclusion ? 5 : 4;
+                if (item.isExclusion) tCtx.setLineDash([14, 6]);
                 tCtx.strokeRect(-w/2, -h/2, w, h);
+                tCtx.setLineDash([]);
 
-                // Label and dB — only when zone is large enough (mirrors live canvas threshold).
-                // Text shadow creates contrast over any heatmap colour or background.
-                if (item.w > 60 && item.h > 32) {
+                // Numbered badge
+                const zoneNum = zones.indexOf(item) + 1;
+                const badgeR  = 18;
+                const bx = w > badgeR * 4 ? -w/2 + badgeR + 10 : 0;
+                const by = h > badgeR * 4 ? -h/2 + badgeR + 10 : 0;
+
+                tCtx.beginPath();
+                tCtx.arc(bx, by, badgeR, 0, Math.PI * 2);
+                tCtx.fillStyle = zoneColor;
+                tCtx.globalAlpha = 0.92;
+                tCtx.fill();
+                tCtx.globalAlpha = 1.0;
+
+                tCtx.fillStyle = '#ffffff';
+                tCtx.font = 'bold 16px Inter, sans-serif';
+                tCtx.textAlign = 'center';
+                tCtx.textBaseline = 'middle';
+                tCtx.fillText(zoneNum, bx, by);
+                tCtx.textAlign = 'start';
+                tCtx.textBaseline = 'alphabetic';
+
+                // SPL reading — skip exclusion and canopy zones
+                if (!isCanopy && !item.isExclusion && item.h > 60) {
+                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
                     tCtx.shadowColor = 'rgba(0,0,0,0.80)';
                     tCtx.shadowBlur  = 8;
-
-                    // Zone label (top-left)
-                    tCtx.fillStyle = '#ffffff';
-                    tCtx.font = '500 26px Inter, sans-serif';
+                    tCtx.font = `600 28px "JetBrains Mono", monospace`;
+                    tCtx.fillStyle = dbV > 85 ? acc : '#ffffff';
                     tCtx.textBaseline = 'alphabetic';
-                    tCtx.fillText(item.label, -w/2 + 14, -h/2 + 36);
-
-                    // SPL reading (bottom-left, mono) — skip for canopy zones
-                    if (!isCanopy && item.h > 60) {
-                        const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                        tCtx.font = `600 28px "JetBrains Mono", monospace`;
-                        tCtx.fillStyle = dbV > 85 ? acc : '#ffffff';
-                        tCtx.fillText(`${Math.round(dbV)} dB`, -w/2 + 14, h/2 - 14);
-                    }
-
+                    tCtx.fillText(`${Math.round(dbV)} dB`, -w/2 + 14, h/2 - 14);
                     tCtx.shadowBlur = 0;
                 }
             }
@@ -2311,7 +2479,7 @@
 
                 tCtx.fillStyle = t1;
                 tCtx.font = '500 22px Inter, sans-serif';
-                tCtx.fillText(`SPK ${i + 1}`, pad + 36, ry);
+                tCtx.fillText(s.label || `SPK ${i + 1}`, pad + 36, ry);
 
                 tCtx.textAlign = 'right';
                 tCtx.font = '500 22px "JetBrains Mono", monospace';
@@ -2348,20 +2516,28 @@
             tCtx.fillRect(zOff, tY + tHeadH - 1, eW - zOff - pad, 1);
 
             zones.forEach((o, i) => {
-                const ry       = tY + tHeadH + i * tRowH + tRowH / 2;
-                const isCanopy = MATERIAL_PRESETS[o.material]?.type === 'canopy';
-                const dbV      = isCanopy ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
-                const cfg      = ZONE_CONFIG[o.type] || {};
+                const ry          = tY + tHeadH + i * tRowH + tRowH / 2;
+                const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+                const isExclusion = o.isExclusion;
+                const dbV         = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                const cfg         = ZONE_CONFIG[o.type] || {};
+                const zoneColor   = o.customColor ?? cfg.color ?? t3;
 
                 if (i % 2 === 0) {
                     tCtx.fillStyle = bg;
                     tCtx.fillRect(divX + 1, tY + tHeadH + i * tRowH, eW - divX - 1, tRowH);
                 }
 
+                // Numbered badge using zone color
                 tCtx.beginPath();
-                tCtx.arc(cDot + 10, ry, 9, 0, Math.PI * 2);
-                tCtx.fillStyle = cfg.color || t3;
+                tCtx.arc(cDot + 14, ry, 13, 0, Math.PI * 2);
+                tCtx.fillStyle = zoneColor;
                 tCtx.fill();
+                tCtx.fillStyle = '#ffffff';
+                tCtx.font = 'bold 14px Inter, sans-serif';
+                tCtx.textAlign = 'center';
+                tCtx.fillText(i + 1, cDot + 14, ry);
+                tCtx.textAlign = 'start';
 
                 tCtx.textBaseline = 'middle';
 
@@ -2369,9 +2545,12 @@
                 tCtx.font = '500 22px Inter, sans-serif';
                 tCtx.fillText(o.label, cName, ry);
 
-                tCtx.fillStyle = isCanopy ? t3 : t2;
+                tCtx.fillStyle = (isCanopy || isExclusion) ? t3 : t2;
                 tCtx.font = '400 20px Inter, sans-serif';
-                tCtx.fillText(isCanopy ? 'pass-through' : o.material, cMat, ry);
+                tCtx.fillText(
+                    isExclusion ? 'exclusion' : isCanopy ? 'pass-through' : o.material,
+                    cMat, ry
+                );
 
                 tCtx.fillStyle = t2;
                 tCtx.font = '400 20px "JetBrains Mono", monospace';
@@ -2380,7 +2559,7 @@
                 tCtx.fillText(`${o.reflection ?? '—'}`, cRefl, ry);
 
                 tCtx.textAlign = 'right';
-                if (isCanopy) {
+                if (isCanopy || isExclusion) {
                     tCtx.fillStyle = t3;
                     tCtx.font = '400 20px "JetBrains Mono", monospace';
                     tCtx.fillText('—', cSpl, ry);
@@ -2540,6 +2719,113 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // 13. SATELLITE MAP (Leaflet + Esri World Imagery)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    let leafletMap  = null;
+    let geoOrigin   = null;   // {lat,lng} of canvas world-space (0,0)
+
+    // Leaflet meters-per-pixel at current zoom + center latitude
+    function leafletMPP() {
+        const c = leafletMap.getCenter();
+        return 156543.03392 * Math.cos(c.lat * Math.PI / 180) / Math.pow(2, leafletMap.getZoom());
+    }
+
+    // Drive canvas pan/zoom from Leaflet's current view
+    function syncCanvasFromLeaflet() {
+        if (!leafletMap || !geoOrigin) return;
+        const mpp = leafletMPP();
+        state.ui.zoom  = 1 / (mpp * state.doc.scale);
+        const pt = leafletMap.latLngToContainerPoint(geoOrigin);
+        state.ui.pan.x = pt.x;
+        state.ui.pan.y = pt.y;
+        updateZoomDisplay();
+        markDirty('canvas', 'heatmap');
+    }
+
+    function initLeafletMap() {
+        const mapDiv = document.getElementById('leafletMap');
+        leafletMap = L.map(mapDiv, {
+            zoomControl: false, attributionControl: true,
+            dragging: false, scrollWheelZoom: false,
+            doubleClickZoom: false, boxZoom: false, keyboard: false
+        });
+        L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            { attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxZoom: 19 }
+        ).addTo(leafletMap);
+        leafletMap.setView([52.5, -1.5], 15);
+        leafletMap.on('move zoom', syncCanvasFromLeaflet);
+    }
+
+    function toggleSatellite() {
+        state.ui.mapMode = !state.ui.mapMode;
+        const mapDiv  = document.getElementById('leafletMap');
+        const btn     = document.getElementById('satelliteBtn');
+        const section = document.getElementById('satelliteSection');
+
+        if (state.ui.mapMode) {
+            mapDiv.style.display = '';
+            btn.classList.add('active');
+            section.style.display = '';
+
+            if (!leafletMap) {
+                initLeafletMap();
+                // Place canvas world origin at screen centre
+                state.ui.pan = { x: state.ui.width / 2, y: state.ui.height / 2 };
+            }
+            leafletMap.invalidateSize();
+            // Derive geoOrigin from where canvas world (0,0) currently sits on screen
+            geoOrigin = leafletMap.containerPointToLatLng(
+                L.point(state.ui.pan.x, state.ui.pan.y)
+            );
+            syncCanvasFromLeaflet();
+        } else {
+            mapDiv.style.display = 'none';
+            btn.classList.remove('active');
+            section.style.display = 'none';
+            markDirty('canvas', 'heatmap');
+        }
+    }
+
+    async function searchLocation() {
+        const query = document.getElementById('locationSearch').value.trim();
+        if (!query || !leafletMap) return;
+        try {
+            const resp = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+                { headers: { 'Accept-Language': 'en' } }
+            );
+            const results = await resp.json();
+            if (results.length) {
+                leafletMap.setView([parseFloat(results[0].lat), parseFloat(results[0].lon)], 17);
+                // Re-anchor geo origin to new view centre (existing items will shift)
+                geoOrigin = leafletMap.containerPointToLatLng(
+                    L.point(state.ui.pan.x, state.ui.pan.y)
+                );
+                toast(results[0].display_name.split(',').slice(0, 2).join(', '));
+            } else {
+                toast('Location not found', true);
+            }
+        } catch {
+            toast('Search failed — check connection', true);
+        }
+    }
+
+    function syncScaleFromMap() {
+        if (!leafletMap) return;
+        const mpp = leafletMPP();
+        // Set scale so 1 world pixel = 1 m at this zoom, canvasZoom ≈ 1
+        const newScale = Math.max(1, Math.round(1 / mpp));
+        // Update scale without rescaling items (they're geo-referenced)
+        state.doc.scale = newScale;
+        document.getElementById('scaleInput').value  = newScale;
+        document.getElementById('scaleSlider').value = newScale;
+        syncCanvasFromLeaflet();
+        toast(`Scale set to ${newScale} px/m`);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 14. INIT
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -2566,6 +2852,11 @@
         // Scroll to zoom, centred on cursor
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
+            if (state.ui.mapMode && leafletMap) {
+                const delta = e.deltaY < 0 ? 1 : -1;
+                leafletMap.setZoom(leafletMap.getZoom() + delta, { animate: false });
+                return;
+            }
             const s = getScreenPos(e);
             const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
             const newZoom = Math.max(0.15, Math.min(6, state.ui.zoom * factor));
@@ -2635,6 +2926,14 @@
         document.getElementById('projectLoad').addEventListener('change', loadProject);
         document.getElementById('mapUpload').addEventListener('change', handleMapUpload);
         document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+        document.getElementById('satelliteBtn').addEventListener('click', toggleSatellite);
+
+        // Satellite section
+        document.getElementById('locationSearchBtn').addEventListener('click', searchLocation);
+        document.getElementById('locationSearch').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') searchLocation();
+        });
+        document.getElementById('scaleSyncBtn').addEventListener('click', syncScaleFromMap);
 
         // Event detail fields — live-update state.doc (no dirty flag needed, export-only)
         ['eventName', 'eventDate', 'eventLocation'].forEach(id => {
