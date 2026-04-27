@@ -1364,7 +1364,7 @@
             ctx.font = 'bold 12px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(indexNum, 0, 1);
+            ctx.fillText(indexNum, 0, 0);
             ctx.restore();
 
             ctx.beginPath();
@@ -1410,22 +1410,27 @@
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
             if (sel) {
-                const cs = 6;
+                const hs = 4;
+                ctx.fillStyle = canvasColors.surface;
                 ctx.strokeStyle = canvasColors.accent;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(-w/2, -h/2 + cs); ctx.lineTo(-w/2, -h/2); ctx.lineTo(-w/2 + cs, -h/2);
-                ctx.moveTo(w/2 - cs, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2, -h/2 + cs);
-                ctx.moveTo(w/2, h/2 - cs); ctx.lineTo(w/2, h/2); ctx.lineTo(w/2 - cs, h/2);
-                ctx.moveTo(-w/2 + cs, h/2); ctx.lineTo(-w/2, h/2); ctx.lineTo(-w/2, h/2 - cs);
-                ctx.stroke();
+                ctx.lineWidth = 1.5;
+                const corners = [
+                    {x: -w/2, y: -h/2}, {x: w/2, y: -h/2},
+                    {x: w/2, y: h/2}, {x: -w/2, y: h/2}
+                ];
+                corners.forEach(c => {
+                    ctx.fillRect(c.x - hs, c.y - hs, hs * 2, hs * 2);
+                    ctx.strokeRect(c.x - hs, c.y - hs, hs * 2, hs * 2);
+                });
             }
 
+            const isExcl = item.isExclusion;
+            const dbV = isExcl ? null : calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
+            
             ctx.save();
             ctx.rotate(-item.angle * Math.PI / 180);
             
             const badgeSz = 22;
-            ctx.fillStyle = zoneColor;
             ctx.globalAlpha = 0.92;
             if (ctx.roundRect) {
                 ctx.beginPath();
@@ -1440,7 +1445,7 @@
             ctx.font = 'bold 12px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(indexNum, 0, 1);
+            ctx.fillText(indexNum, 0, 1); // 1px visual offset for perfect vertical centering
 
             ctx.restore();
         }
@@ -1931,7 +1936,7 @@
             const dy = pos.y - cy;
             const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
             const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
-            const hs = 8 / state.ui.zoom;
+            const hs = 16 / state.ui.zoom;
 
             const rhY = selItem.type === 'source' ? -20 : -selItem.h/2 - 20;
             if (Math.hypot(lx, ly - rhY) < hs) { pushHistory(); state.ui.dragAction = 'rotate'; return; }
@@ -2018,13 +2023,38 @@
             }
         }
 
+        const pos = screenToWorld(screenPos.x, screenPos.y);
+
         if (isHoveringList) {
             canvas.style.cursor = 'pointer';
         } else {
-            canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
+            let cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
+            
+            const sel = selectedItem();
+            if (sel && !state.ui.isDragging && !state.ui.dragAction) {
+                const cx = sel.x + (sel.w ? sel.w / 2 : 0);
+                const cy = sel.y + (sel.h ? sel.h / 2 : 0);
+                const rad = -sel.angle * Math.PI / 180;
+                const dx = pos.x - cx;
+                const dy = pos.y - cy;
+                const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
+                const hs = 16 / state.ui.zoom; 
+                
+                const rhY = sel.type === 'source' ? -20 : -sel.h/2 - 20;
+                if (Math.hypot(lx, ly - rhY) < hs) {
+                    cursor = 'alias';
+                } else if (sel.type !== 'source') {
+                    const w2 = sel.w/2, h2 = sel.h/2;
+                    if (Math.abs(lx - (-w2)) < hs && Math.abs(ly - (-h2)) < hs) cursor = 'nwse-resize';
+                    else if (Math.abs(lx - w2) < hs && Math.abs(ly - (-h2)) < hs) cursor = 'nesw-resize';
+                    else if (Math.abs(lx - w2) < hs && Math.abs(ly - h2) < hs) cursor = 'nwse-resize';
+                    else if (Math.abs(lx - (-w2)) < hs && Math.abs(ly - h2) < hs) cursor = 'nesw-resize';
+                }
+            }
+            canvas.style.cursor = cursor;
         }
 
-        const pos = screenToWorld(screenPos.x, screenPos.y);
         document.getElementById('xyDisplay').textContent =
             `${Math.round(pos.x / state.doc.scale)}, ${Math.round(pos.y / state.doc.scale)}`;
 
@@ -2463,7 +2493,32 @@
                 tCtx.font = 'bold 15px Inter, sans-serif';
                 tCtx.textAlign = 'center';
                 tCtx.textBaseline = 'middle';
-                tCtx.fillText(srcNum, 0, 1.5);
+                tCtx.fillText(srcNum, 0, 1.5); // 1.5px visual offset
+
+                if (item.label) {
+                    tCtx.font = '600 18px Inter, sans-serif';
+                    const tw = tCtx.measureText(item.label).width;
+                    const ph = 32, pPad = 12;
+                    const labelX = 28; // Display cleanly to the right of the icon
+                    const labelY = 0;
+                    
+                    tCtx.fillStyle = surf;
+                    if (tCtx.roundRect) {
+                        tCtx.beginPath();
+                        tCtx.roundRect(labelX, labelY - ph/2, tw + pPad * 2, ph, 4);
+                        tCtx.fill();
+                    } else {
+                        tCtx.fillRect(labelX, labelY - ph/2, tw + pPad * 2, ph);
+                    }
+                    
+                    tCtx.lineWidth = 1.5;
+                    tCtx.strokeStyle = bord;
+                    tCtx.strokeRect(labelX, labelY - ph/2, tw + pPad * 2, ph);
+                    
+                    tCtx.fillStyle = t1;
+                    tCtx.textAlign = 'left';
+                    tCtx.fillText(item.label, labelX + pPad, labelY + 1.5);
+                }
 
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
@@ -2514,7 +2569,7 @@
                 tCtx.font = 'bold 18px Inter, sans-serif';
                 tCtx.textAlign = 'center';
                 tCtx.textBaseline = 'middle';
-                tCtx.fillText(zoneNum, bx, by + 1.5);
+                tCtx.fillText(zoneNum, bx, by + 1.5); // 1.5px visual offset
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
             }
