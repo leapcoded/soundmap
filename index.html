@@ -1495,6 +1495,7 @@
         
         ctx.save();
         ctx.globalAlpha = state.doc.heatmapOpacity / 100;
+        ctx.filter = `blur(${HEATMAP_STEP * 1.5}px)`;
         ctx.drawImage(offscreenHeatmap, 0, 0);
         ctx.restore();
 
@@ -2366,8 +2367,9 @@
             tCtx.globalAlpha = 1.0;
         }
 
-        tCtx.save();
-        tCtx.globalAlpha = state.doc.heatmapOpacity / 100;
+        const hC = document.createElement('canvas');
+        hC.width = eW; hC.height = mapH;
+        const hCtx = hC.getContext('2d');
 
         const scheme = INTENSITY_SCHEMES[state.doc.scheme];
         const floor  = state.doc.noiseFloor;
@@ -2376,12 +2378,16 @@
                 const { x: wx, y: wy } = screenToWorld(x / factor, y / factor);
                 const db = calculateTotalDb(wx, wy);
                 if (db > floor + 1) {
-                    tCtx.fillStyle = scheme(db, 0.4);
-                    tCtx.fillRect(x, hH + y, EXPORT_HEATMAP_STEP + 1, EXPORT_HEATMAP_STEP + 1);
+                    hCtx.fillStyle = scheme(db, 0.4);
+                    hCtx.fillRect(x, y, EXPORT_HEATMAP_STEP + 1, EXPORT_HEATMAP_STEP + 1);
                 }
             }
         }
-        
+
+        tCtx.save();
+        tCtx.globalAlpha = state.doc.heatmapOpacity / 100;
+        tCtx.filter = `blur(${EXPORT_HEATMAP_STEP * 4}px)`;
+        tCtx.drawImage(hC, 0, hH);
         tCtx.restore();
 
         const vZoom = state.ui.zoom;
@@ -2476,17 +2482,6 @@
                 tCtx.fillText(zoneNum, bx, by);
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
-
-                if (!isCanopy && !item.isExclusion && h > 40 && w > 80) {
-                    const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
-                    tCtx.shadowColor = 'rgba(0,0,0,0.80)';
-                    tCtx.shadowBlur  = 8;
-                    tCtx.font = `600 28px "JetBrains Mono", monospace`;
-                    tCtx.fillStyle = dbV > 85 ? acc : '#ffffff';
-                    tCtx.textBaseline = 'alphabetic';
-                    tCtx.fillText(`${Math.round(dbV)} dB`, -w/2 + 14, h/2 - 14);
-                    tCtx.shadowBlur = 0;
-                }
             }
             tCtx.restore();
         }
@@ -3138,8 +3133,9 @@
 
             <div class="help-sec">
                 <div class="help-h2">Tools</div>
+                <p class="help-p"><strong>Selection &amp; Manipulation</strong> — click any element on the canvas (or in the schedule panel) to select it. Drag the handles that appear to resize or rotate directly on the plan.</p>
                 <p class="help-p"><strong>Speaker</strong> — click to place. Peak SPL sets the source level; dispersion angle narrows or widens the coverage cone; bass bias shifts spectral energy towards low or high frequencies; mount height affects diffraction over barriers.</p>
-                <p class="help-p"><strong>Hay Bales &amp; Heras</strong> — absorptive barriers. Effective at mid/high frequencies, limited at bass. Works best angled as a baffle rather than a straight wall — use the Rotation slider to adjust.</p>
+                <p class="help-p"><strong>Hay Bales &amp; Heras</strong> — absorptive barriers. Effective at mid/high frequencies, limited at bass. Works best angled as a baffle rather than a straight wall — drag the rotation handle on the canvas or use the Rotation slider to adjust.</p>
                 <p class="help-p"><strong>Zone palette</strong> — areas for the SPL schedule. Canopy zones (stretch tents) are acoustically transparent and are excluded from the SPL table. Speakers under a canopy show a dashed indicator ring.</p>
                 <p class="help-p"><strong>Custom Zones</strong> — use the Custom tool to draw any element. Toggle 'Exclusion zone' in the inspector to block it out with a checkerboard pattern, or use the colour picker for visual organisation.</p>
                 <p class="help-p"><strong>Ruler</strong> — click and drag to measure any distance on the canvas. Reading shown in metres.</p>
@@ -3160,6 +3156,7 @@
                     <span class="help-key">Scroll</span><span class="help-val">Zoom in / out centred on cursor</span>
                     <span class="help-key">Space + drag</span><span class="help-val">Pan the canvas</span>
                     <span class="help-key">Middle drag</span><span class="help-val">Pan the canvas</span>
+                    <span class="help-key">Shift + drag</span><span class="help-val">Disable snapping / 15° rotation lock</span>
                     <span class="help-key">0</span><span class="help-val">Reset view to 1:1</span>
                     <span class="help-key">⌘Z / Ctrl Z</span><span class="help-val">Undo</span>
                     <span class="help-key">⌘⇧Z / Ctrl Y</span><span class="help-val">Redo</span>
