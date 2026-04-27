@@ -1191,21 +1191,25 @@
     }
 
     function renderSchedule() {
+        const sources = state.doc.items.filter(i => i.type === 'source');
         const zones = state.doc.items.filter(i => i.type !== 'source');
-        if (!zones.length) return;
+        const allItems = [...sources, ...zones];
+        if (!allItems.length) return;
 
         const { width } = state.ui;
         const pad = 16;
         const rowH = 22;
         const headerH = 32;
         const panelW = 300;
-        const panelH = headerH + (zones.length * rowH) + 12;
+        const panelH = headerH + (allItems.length * rowH) + 12;
 
         ctx.save();
         ctx.translate(width - panelW - pad, pad);
 
         ctx.fillStyle = canvasColors.surface;
+        ctx.globalAlpha = 0.95;
         ctx.fillRect(0, 0, panelW, panelH);
+        ctx.globalAlpha = 1.0;
         ctx.strokeStyle = canvasColors.border;
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, 0.5, panelW - 1, panelH - 1);
@@ -1213,8 +1217,8 @@
         ctx.fillStyle = canvasColors.text3;
         ctx.font = '500 10px Inter';
         ctx.textBaseline = 'middle';
-        ctx.fillText('ZONE', 12, headerH / 2);
-        ctx.fillText('MATERIAL', 130, headerH / 2);
+        ctx.fillText('ITEM', 12, headerH / 2);
+        ctx.fillText('TYPE/MAT', 130, headerH / 2);
         ctx.textAlign = 'right';
         ctx.fillText('SPL', panelW - 12, headerH / 2);
         ctx.textAlign = 'start';
@@ -1225,40 +1229,69 @@
         ctx.lineTo(panelW, headerH);
         ctx.stroke();
 
-        zones.forEach((o, i) => {
+        allItems.forEach((o, i) => {
             const y = headerH + 6 + (i * rowH) + rowH / 2;
-            const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
-            const isExclusion = o.isExclusion;
-            const dbV = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+            const sel = o.id === state.ui.selectedId;
 
-            const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
-            const zoneColor = o.customColor ?? cfg.color;
-            ctx.fillStyle = zoneColor;
-            ctx.beginPath();
-            ctx.arc(18, y, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = canvasColors.text1;
-            ctx.font = '500 11px Inter';
-            ctx.fillText(o.label, 28, y);
-
-            ctx.fillStyle = (isCanopy || isExclusion) ? canvasColors.text3 : canvasColors.text2;
-            ctx.font = '400 10px Inter';
-            ctx.fillText(
-                isExclusion ? 'exclusion' : isCanopy ? 'pass-through' : o.material,
-                130, y
-            );
-
-            ctx.font = '500 11px "JetBrains Mono"';
-            ctx.textAlign = 'right';
-            if (isCanopy || isExclusion) {
-                ctx.fillStyle = canvasColors.text3;
-                ctx.fillText('—', panelW - 12, y);
-            } else {
-                ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
-                ctx.fillText(`${Math.round(dbV)} dB`, panelW - 12, y);
+            if (sel) {
+                ctx.fillStyle = canvasColors.accent + '22';
+                ctx.fillRect(1, y - rowH/2, panelW - 2, rowH);
             }
-            ctx.textAlign = 'start';
+
+            if (o.type === 'source') {
+                ctx.fillStyle = canvasColors.accent;
+                ctx.beginPath();
+                ctx.arc(18, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = sel ? canvasColors.accent : canvasColors.text1;
+                ctx.font = (sel ? '600 ' : '500 ') + '11px Inter';
+                ctx.fillText(o.label || `Speaker ${sources.indexOf(o) + 1}`, 28, y);
+
+                ctx.fillStyle = canvasColors.text2;
+                ctx.font = '400 10px Inter';
+                ctx.fillText('source', 130, y);
+
+                ctx.font = '500 11px "JetBrains Mono"';
+                ctx.textAlign = 'right';
+                ctx.fillStyle = canvasColors.text1;
+                ctx.fillText(`${o.db} dB`, panelW - 12, y);
+                ctx.textAlign = 'start';
+            } else {
+                const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+                const isExclusion = o.isExclusion;
+                const dbV = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+
+                const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
+                const zoneColor = o.customColor ?? cfg.color;
+                
+                ctx.fillStyle = zoneColor;
+                ctx.beginPath();
+                ctx.arc(18, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = sel ? canvasColors.accent : canvasColors.text1;
+                ctx.font = (sel ? '600 ' : '500 ') + '11px Inter';
+                ctx.fillText(o.label || cfg.label || o.type, 28, y);
+
+                ctx.fillStyle = (isCanopy || isExclusion) ? canvasColors.text3 : canvasColors.text2;
+                ctx.font = '400 10px Inter';
+                ctx.fillText(
+                    isExclusion ? 'exclusion' : isCanopy ? 'pass-through' : o.material,
+                    130, y
+                );
+
+                ctx.font = '500 11px "JetBrains Mono"';
+                ctx.textAlign = 'right';
+                if (isCanopy || isExclusion) {
+                    ctx.fillStyle = canvasColors.text3;
+                    ctx.fillText('—', panelW - 12, y);
+                } else {
+                    ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
+                    ctx.fillText(`${Math.round(dbV)} dB`, panelW - 12, y);
+                }
+                ctx.textAlign = 'start';
+            }
         });
 
         ctx.restore();
@@ -1921,6 +1954,35 @@
             return;
         }
 
+        // Check if clicking on the schedule list
+        const sources = state.doc.items.filter(i => i.type === 'source');
+        const zones = state.doc.items.filter(i => i.type !== 'source');
+        const allItems = [...sources, ...zones];
+        
+        if (allItems.length > 0) {
+            const panelW = 300;
+            const pad = 16;
+            const panelX = state.ui.width - panelW - pad;
+            
+            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
+                const headerH = 32;
+                const panelH = headerH + (allItems.length * 22) + 12;
+                
+                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
+                    const localY = screenPos.y - pad - headerH - 6;
+                    const rowIndex = Math.floor(localY / 22);
+                    
+                    if (rowIndex >= 0 && rowIndex < allItems.length) {
+                        const clickedItem = allItems[rowIndex];
+                        state.ui.selectedId = clickedItem.id;
+                        setMode('select'); // Switch tools automatically
+                        markDirty('canvas', 'inspector');
+                        return; // Stop further handling so it doesn't drop items behind the menu
+                    }
+                }
+            }
+        }
+
         if (mode === 'ruler') {
             state.ui.rulerStart = pos;
             state.ui.rulerEnd = pos;
@@ -1978,6 +2040,34 @@
                 markDirty('canvas', 'heatmap');
             }
             return;
+        }
+
+        let isHoveringList = false;
+        const sources = state.doc.items.filter(i => i.type === 'source');
+        const zones = state.doc.items.filter(i => i.type !== 'source');
+        const allItems = [...sources, ...zones];
+
+        if (allItems.length > 0) {
+            const panelW = 300;
+            const pad = 16;
+            const panelX = state.ui.width - panelW - pad;
+            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
+                const headerH = 32;
+                const panelH = headerH + (allItems.length * 22) + 12;
+                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
+                    const localY = screenPos.y - pad - headerH - 6;
+                    const rowIndex = Math.floor(localY / 22);
+                    if (rowIndex >= 0 && rowIndex < allItems.length) {
+                        isHoveringList = true;
+                    }
+                }
+            }
+        }
+
+        if (isHoveringList) {
+            canvas.style.cursor = 'pointer';
+        } else {
+            canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
         }
 
         const pos = screenToWorld(screenPos.x, screenPos.y);
