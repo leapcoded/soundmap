@@ -610,6 +610,14 @@
         <div id="canvasWrap" class="flex-1 relative overflow-hidden" style="background: var(--bg);">
             <div id="leafletMap" style="position:absolute;inset:0;z-index:0;display:none;"></div>
             <canvas id="mapCanvas" style="position:absolute;inset:0;z-index:1;display:block;"></canvas>
+            
+            <!-- DOM UI Overlay -->
+            <div id="uiOverlay" style="position:absolute;inset:0;z-index:5;pointer-events:none;">
+                <div id="domLegend" style="position:absolute;top:16px;left:16px;background:var(--surface);border:1px solid var(--border);padding:12px;border-radius:3px;opacity:0.95;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                <div id="domSchedule" class="scroll" style="position:absolute;top:16px;right:16px;width:320px;max-height:calc(100% - 80px);border-radius:3px;opacity:0.95;pointer-events:auto;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                <div id="domCalibration" style="position:absolute;bottom:50px;right:16px;display:flex;flex-direction:column;align-items:center;opacity:0.95;"></div>
+            </div>
+
             <div class="hud" style="z-index:10">
                 <div class="hud-cell">
                     <span class="hud-label">Pos</span>
@@ -836,6 +844,8 @@
             mode: 'source',
             selectedId: null,
             isDragging: false,
+            dragAction: null,
+            snapLines: [],
             dragOffset: { x: 0, y: 0 },
             rulerStart: null,
             rulerEnd: null,
@@ -853,7 +863,7 @@
         history: { past: [], future: [] }
     };
 
-    const dirty = { canvas: true, heatmap: true, inspector: true };
+    const dirty = { canvas: true, heatmap: true, inspector: true, ui: true };
     function markDirty(...flags) { for (const f of flags) dirty[f] = true; }
 
     function groundFactor() { return GROUND_FACTORS[state.doc.groundType] ?? 1.0; }
@@ -869,7 +879,7 @@
         state.doc = JSON.parse(snap);
         state.ui.selectedId = null;
         syncGlobalInputs();
-        markDirty('canvas', 'heatmap', 'inspector');
+        markDirty('canvas', 'heatmap', 'inspector', 'ui');
     }
 
     function pushHistory() {
@@ -1190,184 +1200,79 @@
         ctx.restore();
     }
 
-    function renderSchedule() {
+    function updateDomUI() {
+        const scheme = INTENSITY_SCHEMES[state.doc.scheme];
         const sources = state.doc.items.filter(i => i.type === 'source');
         const zones = state.doc.items.filter(i => i.type !== 'source');
         const allItems = [...sources, ...zones];
-        if (!allItems.length) return;
 
-        const { width } = state.ui;
-        const pad = 16;
-        const rowH = 22;
-        const headerH = 32;
-        const panelW = 300;
-        const panelH = headerH + (allItems.length * rowH) + 12;
+        const schedEl = document.getElementById('domSchedule');
+        if (!allItems.length) {
+            schedEl.style.display = 'none';
+        } else {
+            schedEl.style.display = 'block';
+            let html = `<div style="display:flex;font-size:10px;color:var(--text-3);font-weight:600;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);">
+                <div style="flex:1">ITEM</div><div style="width:100px;">TYPE/MAT</div><div style="width:60px;text-align:right;">SPL</div>
+            </div>`;
+            allItems.forEach((o) => {
+                const sel = o.id === state.ui.selectedId;
+                const bg = sel ? 'background:var(--accent-faint);' : 'background:var(--surface);';
+                const color = sel ? 'color:var(--accent);font-weight:600;' : 'color:var(--text-1);font-weight:500;';
 
-        ctx.save();
-        ctx.translate(width - panelW - pad, pad);
-
-        ctx.fillStyle = canvasColors.surface;
-        ctx.globalAlpha = 0.95;
-        ctx.fillRect(0, 0, panelW, panelH);
-        ctx.globalAlpha = 1.0;
-        ctx.strokeStyle = canvasColors.border;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, panelW - 1, panelH - 1);
-
-        ctx.fillStyle = canvasColors.text3;
-        ctx.font = '500 10px Inter';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('ITEM', 12, headerH / 2);
-        ctx.fillText('TYPE/MAT', 130, headerH / 2);
-        ctx.textAlign = 'right';
-        ctx.fillText('SPL', panelW - 12, headerH / 2);
-        ctx.textAlign = 'start';
-
-        ctx.strokeStyle = canvasColors.border;
-        ctx.beginPath();
-        ctx.moveTo(0, headerH);
-        ctx.lineTo(panelW, headerH);
-        ctx.stroke();
-
-        allItems.forEach((o, i) => {
-            const y = headerH + 6 + (i * rowH) + rowH / 2;
-            const sel = o.id === state.ui.selectedId;
-
-            if (sel) {
-                ctx.fillStyle = canvasColors.accent + '22';
-                ctx.fillRect(1, y - rowH/2, panelW - 2, rowH);
-            }
-
-            if (o.type === 'source') {
-                ctx.fillStyle = canvasColors.accent;
-                ctx.beginPath();
-                ctx.arc(18, y, 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = sel ? canvasColors.accent : canvasColors.text1;
-                ctx.font = (sel ? '600 ' : '500 ') + '11px Inter';
-                ctx.fillText(o.label || `Speaker ${sources.indexOf(o) + 1}`, 28, y);
-
-                ctx.fillStyle = canvasColors.text2;
-                ctx.font = '400 10px Inter';
-                ctx.fillText('source', 130, y);
-
-                ctx.font = '500 11px "JetBrains Mono"';
-                ctx.textAlign = 'right';
-                ctx.fillStyle = canvasColors.text1;
-                ctx.fillText(`${o.db} dB`, panelW - 12, y);
-                ctx.textAlign = 'start';
-            } else {
-                const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
-                const isExclusion = o.isExclusion;
-                const dbV = isExclusion ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
-
-                const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
-                const zoneColor = o.customColor ?? cfg.color;
-                
-                ctx.fillStyle = zoneColor;
-                ctx.beginPath();
-                ctx.arc(18, y, 3, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = sel ? canvasColors.accent : canvasColors.text1;
-                ctx.font = (sel ? '600 ' : '500 ') + '11px Inter';
-                ctx.fillText(o.label || cfg.label || o.type, 28, y);
-
-                ctx.fillStyle = (isCanopy || isExclusion) ? canvasColors.text3 : canvasColors.text2;
-                ctx.font = '400 10px Inter';
-                ctx.fillText(
-                    isExclusion ? 'exclusion' : isCanopy ? 'pass-through' : o.material,
-                    130, y
-                );
-
-                ctx.font = '500 11px "JetBrains Mono"';
-                ctx.textAlign = 'right';
-                if (isExclusion) {
-                    ctx.fillStyle = canvasColors.text3;
-                    ctx.fillText('—', panelW - 12, y);
+                let splText = '—';
+                let typeText = o.type === 'source' ? 'source' : o.material;
+                if (o.type !== 'source') {
+                    const isCanopy = MATERIAL_PRESETS[o.material]?.type === 'canopy';
+                    if (o.isExclusion) typeText = 'exclusion';
+                    else if (isCanopy) typeText = 'pass-through';
+                    if (!o.isExclusion) {
+                        const dbV = calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                        splText = `${Math.round(dbV)} dB`;
+                    }
                 } else {
-                    ctx.fillStyle = dbV > 85 ? canvasColors.accent : canvasColors.text1;
-                    ctx.fillText(`${Math.round(dbV)} dB`, panelW - 12, y);
+                    splText = `${o.db} dB`;
                 }
-                ctx.textAlign = 'start';
-            }
-        });
+                const label = o.label || (o.type === 'source' ? `Speaker ${sources.indexOf(o) + 1}` : (ZONE_CONFIG[o.type]?.label || o.type));
+                const iconColor = o.type === 'source' ? canvasColors.accent : (o.customColor ?? ZONE_CONFIG[o.type]?.color ?? canvasColors.text3);
 
-        ctx.restore();
-        ctx.textBaseline = 'alphabetic';
-    }
-
-    function renderLegend() {
-        const pad = 16;
-        const stripW = 6;
-        const stripH = 180;
-        const scheme = INTENSITY_SCHEMES[state.doc.scheme];
-
-        ctx.save();
-        ctx.translate(pad, pad);
-
-        ctx.fillStyle = canvasColors.text3;
-        ctx.font = '500 10px Inter';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText('SPL (dB)', 0, 10);
-
-        const stripY = 20;
-        for (let i = 0; i < stripH; i += 2) {
-            const db = 30 + ((stripH - i) / stripH) * 100;
-            ctx.fillStyle = scheme(db, 0.85);
-            ctx.fillRect(0, stripY + i, stripW, 2);
-        }
-        ctx.strokeStyle = canvasColors.border;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, stripY + 0.5, stripW - 1, stripH - 1);
-
-        ctx.fillStyle = canvasColors.text2;
-        ctx.font = '400 10px "JetBrains Mono"';
-        ctx.textBaseline = 'middle';
-        for (let db = 30; db <= 130; db += 20) {
-            const y = stripY + stripH - ((db - 30) / 100) * stripH;
-            ctx.strokeStyle = canvasColors.border;
-            ctx.beginPath();
-            ctx.moveTo(stripW, y);
-            ctx.lineTo(stripW + 3, y);
-            ctx.stroke();
-            ctx.fillText(db, stripW + 6, y);
+                html += `<div data-id="${o.id}" class="sched-row" style="display:flex;align-items:center;padding:8px 16px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);${bg} transition:background 0.1s;">
+                    <div style="width:12px;height:12px;border-radius:50%;background:${iconColor};margin-right:12px;"></div>
+                    <div style="flex:1;${color}">${label}</div>
+                    <div style="width:100px;color:var(--text-2);font-size:10px;">${typeText}</div>
+                    <div class="mono" style="width:60px;text-align:right;color:${(splText !== '—' && parseInt(splText) > 85) ? 'var(--accent)' : 'var(--text-1)'};">${splText}</div>
+                </div>`;
+            });
+            schedEl.innerHTML = html;
+            schedEl.querySelectorAll('.sched-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    state.ui.selectedId = parseFloat(row.dataset.id);
+                    setMode('select');
+                    markDirty('canvas', 'inspector', 'ui');
+                });
+                row.addEventListener('mouseenter', () => { if (row.style.background !== 'var(--accent-faint)') row.style.background = 'var(--surface-2)'; });
+                row.addEventListener('mouseleave', () => { if (row.style.background !== 'var(--accent-faint)') row.style.background = 'var(--surface)'; });
+            });
         }
 
-        ctx.restore();
-        ctx.textBaseline = 'alphabetic';
-    }
+        const legEl = document.getElementById('domLegend');
+        let legHtml = `<div style="font-size:10px;color:var(--text-3);font-weight:600;margin-bottom:8px;">SPL (dB)</div>`;
+        legHtml += `<div style="display:flex;height:180px;">`;
+        legHtml += `<div style="width:6px;height:100%;border:1px solid var(--border);background:linear-gradient(to top, `;
+        const stops = [];
+        for(let i=0; i<=100; i+=10) stops.push(`${scheme(30 + i, 0.85)} ${i}%`);
+        legHtml += stops.join(', ') + `);"></div>`;
+        legHtml += `<div style="display:flex;flex-direction:column;justify-content:space-between;margin-left:8px;font-size:10px;color:var(--text-2);font-family:var(--font-mono);">`;
+        for(let db=130; db>=30; db-=20) legHtml += `<div>${db}</div>`;
+        legHtml += `</div></div>`;
+        legEl.innerHTML = legHtml;
 
-    function renderCalibrationBar() {
-        const { width, height } = state.ui;
-        const pad = 16;
+        const calEl = document.getElementById('domCalibration');
         const barW = 10 * state.doc.scale;
-        const barH = 4;
-        const x = width - barW - pad;
-        const y = height - pad - barH - 14;
-
-        const segments = 5;
-        const segW = barW / segments;
-        for (let i = 0; i < segments; i++) {
-            ctx.fillStyle = i % 2 === 0 ? canvasColors.text1 : canvasColors.surface;
-            ctx.fillRect(x + i * segW, y, segW, barH);
-        }
-        ctx.strokeStyle = canvasColors.text1;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, barW - 1, barH - 1);
-
-        ctx.beginPath();
-        ctx.moveTo(x + 0.5, y - 2); ctx.lineTo(x + 0.5, y + barH + 2);
-        ctx.moveTo(x + barW - 0.5, y - 2); ctx.lineTo(x + barW - 0.5, y + barH + 2);
-        ctx.stroke();
-
-        ctx.fillStyle = canvasColors.text2;
-        ctx.font = '400 10px "JetBrains Mono"';
-        ctx.textAlign = 'center';
-        ctx.fillText('0', x, y + barH + 12);
-        ctx.fillText('10 m', x + barW, y + barH + 12);
-        ctx.textAlign = 'start';
+        let calHtml = `<div style="display:flex;width:${barW}px;height:4px;border:1px solid var(--text-1);margin-bottom:8px;">`;
+        for(let i=0; i<5; i++) calHtml += `<div style="flex:1;background:${i%2===0 ? 'var(--text-1)' : 'transparent'};"></div>`;
+        calHtml += `</div>`;
+        calHtml += `<div style="display:flex;justify-content:space-between;width:${barW}px;font-size:10px;color:var(--text-2);font-family:var(--font-mono);text-shadow: 0 1px 2px var(--bg);"><span>0</span><span>10 m</span></div>`;
+        calEl.innerHTML = calHtml;
     }
 
     function renderRuler() {
@@ -1502,18 +1407,6 @@
             ctx.lineWidth = sel ? 2 : (item.isExclusion ? 1.75 : 1.25);
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-            if (sel) {
-                const cs = 6;
-                ctx.strokeStyle = canvasColors.accent;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(-w/2, -h/2 + cs); ctx.lineTo(-w/2, -h/2); ctx.lineTo(-w/2 + cs, -h/2);
-                ctx.moveTo(w/2 - cs, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2, -h/2 + cs);
-                ctx.moveTo(w/2, h/2 - cs); ctx.lineTo(w/2, h/2); ctx.lineTo(w/2 - cs, h/2);
-                ctx.moveTo(-w/2 + cs, h/2); ctx.lineTo(-w/2, h/2); ctx.lineTo(-w/2, h/2 - cs);
-                ctx.stroke();
-            }
-
             const isExcl = item.isExclusion;
             const dbV = isExcl ? null : calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
             const dbStr = dbV != null ? `${Math.round(dbV)} dB` : 'exclusion';
@@ -1550,6 +1443,34 @@
             
             ctx.restore();
         }
+
+        if (sel) {
+            ctx.strokeStyle = canvasColors.accent;
+            ctx.fillStyle = canvasColors.surface;
+            ctx.lineWidth = 1.5;
+            const rhY = item.type === 'source' ? -20 : -h/2 - 20;
+
+            ctx.beginPath();
+            ctx.moveTo(0, item.type === 'source' ? 0 : -h/2);
+            ctx.lineTo(0, rhY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, rhY, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            if (item.type !== 'source') {
+                const hs = 4;
+                const corners = [
+                    {x: -w/2, y: -h/2}, {x: w/2, y: -h/2},
+                    {x: w/2, y: h/2}, {x: -w/2, y: h/2}
+                ];
+                corners.forEach(c => {
+                    ctx.fillRect(c.x - hs, c.y - hs, hs*2, hs*2);
+                    ctx.strokeRect(c.x - hs, c.y - hs, hs*2, hs*2);
+                });
+            }
+        }
         ctx.restore();
     }
 
@@ -1585,11 +1506,21 @@
         zones.forEach((item, i) => renderItem(item, i + 1));
         sources.forEach((item, i) => renderItem(item, i + 1));
         
+        if (state.ui.snapLines && state.ui.snapLines.length > 0) {
+            ctx.strokeStyle = canvasColors.accent;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            state.ui.snapLines.forEach(l => {
+                ctx.beginPath();
+                ctx.moveTo(l.x1, l.y1);
+                ctx.lineTo(l.x2, l.y2);
+                ctx.stroke();
+            });
+            ctx.setLineDash([]);
+        }
+
         ctx.restore();
 
-        renderSchedule();
-        renderLegend();
-        renderCalibrationBar();
         renderRuler();
         renderWindIndicator();
         dirty.canvas = false;
@@ -1657,6 +1588,7 @@
 
     function renderLoop() {
         if (dirty.canvas || dirty.heatmap) renderCanvas();
+        if (dirty.ui || dirty.heatmap) { updateDomUI(); dirty.ui = false; }
         if (dirty.inspector) { renderInspector(); dirty.inspector = false; }
         requestAnimationFrame(renderLoop);
     }
@@ -1747,7 +1679,7 @@
             item.material = sel.value;
             item.absorption = MATERIAL_PRESETS[sel.value].abs;
             item.reflection  = Math.round(MATERIAL_PRESETS[sel.value].blocking * 100);
-            markDirty('canvas', 'heatmap');
+            markDirty('canvas', 'heatmap', 'ui');
         });
         wrap.appendChild(sel);
         return wrap;
@@ -1807,7 +1739,7 @@
                 colorInp.style.cssText = 'width:100%;height:32px;padding:2px;border:1px solid var(--border);border-radius:3px;background:var(--surface-2);cursor:pointer;';
                 colorInp.addEventListener('input', () => {
                     item.customColor = colorInp.value;
-                    markDirty('canvas');
+                    markDirty('canvas', 'ui');
                 });
                 colorWrap.appendChild(colorInp);
                 row.appendChild(colorWrap);
@@ -1822,7 +1754,7 @@
                 excInp.style.cssText = 'width:14px;height:14px;accent-color:var(--accent);cursor:pointer;';
                 excInp.addEventListener('change', () => {
                     item.isExclusion = excInp.checked;
-                    markDirty('canvas', 'heatmap');
+                    markDirty('canvas', 'heatmap', 'ui');
                 });
                 const excText = el('span');
                 excText.textContent = 'On';
@@ -1964,40 +1896,33 @@
             return;
         }
 
-        // Check if clicking on the schedule list
-        const sources = state.doc.items.filter(i => i.type === 'source');
-        const zones = state.doc.items.filter(i => i.type !== 'source');
-        const allItems = [...sources, ...zones];
-        
-        if (allItems.length > 0) {
-            const panelW = 300;
-            const pad = 16;
-            const panelX = state.ui.width - panelW - pad;
-            
-            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
-                const headerH = 32;
-                const panelH = headerH + (allItems.length * 22) + 12;
-                
-                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
-                    const localY = screenPos.y - pad - headerH - 6;
-                    const rowIndex = Math.floor(localY / 22);
-                    
-                    if (rowIndex >= 0 && rowIndex < allItems.length) {
-                        const clickedItem = allItems[rowIndex];
-                        state.ui.selectedId = clickedItem.id;
-                        setMode('select'); // Switch tools automatically
-                        markDirty('canvas', 'inspector');
-                        return; // Stop further handling so it doesn't drop items behind the menu
-                    }
-                }
-            }
-        }
-
         if (mode === 'ruler') {
             state.ui.rulerStart = pos;
             state.ui.rulerEnd = pos;
             markDirty('canvas');
             return;
+        }
+
+        const selItem = selectedItem();
+        if (selItem) {
+            const cx = selItem.x + (selItem.w ? selItem.w / 2 : 0);
+            const cy = selItem.y + (selItem.h ? selItem.h / 2 : 0);
+            const rad = -selItem.angle * Math.PI / 180;
+            const dx = pos.x - cx;
+            const dy = pos.y - cy;
+            const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
+            const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
+            const hs = 8 / state.ui.zoom;
+
+            const rhY = selItem.type === 'source' ? -20 : -selItem.h/2 - 20;
+            if (Math.hypot(lx, ly - rhY) < hs) { pushHistory(); state.ui.dragAction = 'rotate'; return; }
+            if (selItem.type !== 'source') {
+                const w2 = selItem.w/2, h2 = selItem.h/2;
+                if (Math.abs(lx - (-w2)) < hs && Math.abs(ly - (-h2)) < hs) { pushHistory(); state.ui.dragAction = 'resize-tl'; return; }
+                if (Math.abs(lx - w2) < hs && Math.abs(ly - (-h2)) < hs) { pushHistory(); state.ui.dragAction = 'resize-tr'; return; }
+                if (Math.abs(lx - w2) < hs && Math.abs(ly - h2) < hs) { pushHistory(); state.ui.dragAction = 'resize-br'; return; }
+                if (Math.abs(lx - (-w2)) < hs && Math.abs(ly - h2) < hs) { pushHistory(); state.ui.dragAction = 'resize-bl'; return; }
+            }
         }
 
         const hit = findItemAt(pos);
@@ -2006,20 +1931,20 @@
                 pushHistory();
                 state.doc.items = state.doc.items.filter(i => i !== hit);
                 state.ui.selectedId = null;
-                markDirty('canvas', 'heatmap', 'inspector');
+                markDirty('canvas', 'heatmap', 'inspector', 'ui');
             } else {
                 state.ui.selectedId = hit.id;
                 state.ui.isDragging = true;
                 state.ui.dragOffset.x = pos.x - hit.x;
                 state.ui.dragOffset.y = pos.y - hit.y;
-                markDirty('canvas', 'inspector');
+                markDirty('canvas', 'inspector', 'ui');
             }
             return;
         }
 
         if (mode === 'delete' || mode === 'ruler' || mode === 'select') {
             state.ui.selectedId = null;
-            markDirty('canvas', 'inspector');
+            markDirty('canvas', 'inspector', 'ui');
             return;
         }
 
@@ -2031,7 +1956,7 @@
 
         state.doc.items.push(newItem);
         state.ui.selectedId = newItem.id;
-        markDirty('canvas', 'heatmap', 'inspector');
+        markDirty('canvas', 'heatmap', 'inspector', 'ui');
     }
 
     function handleMouseMove(e) {
@@ -2052,33 +1977,7 @@
             return;
         }
 
-        let isHoveringList = false;
-        const sources = state.doc.items.filter(i => i.type === 'source');
-        const zones = state.doc.items.filter(i => i.type !== 'source');
-        const allItems = [...sources, ...zones];
-
-        if (allItems.length > 0) {
-            const panelW = 300;
-            const pad = 16;
-            const panelX = state.ui.width - panelW - pad;
-            if (screenPos.x >= panelX && screenPos.x <= panelX + panelW) {
-                const headerH = 32;
-                const panelH = headerH + (allItems.length * 22) + 12;
-                if (screenPos.y >= pad && screenPos.y <= pad + panelH) {
-                    const localY = screenPos.y - pad - headerH - 6;
-                    const rowIndex = Math.floor(localY / 22);
-                    if (rowIndex >= 0 && rowIndex < allItems.length) {
-                        isHoveringList = true;
-                    }
-                }
-            }
-        }
-
-        if (isHoveringList) {
-            canvas.style.cursor = 'pointer';
-        } else {
-            canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
-        }
+        canvas.style.cursor = state.ui.spaceDown ? 'grab' : 'crosshair';
 
         const pos = screenToWorld(screenPos.x, screenPos.y);
         document.getElementById('xyDisplay').textContent =
@@ -2093,96 +1992,127 @@
         const db = calculateTotalDb(pos.x, pos.y);
         document.getElementById('currentDb').textContent = Math.round(db);
 
-        if (state.ui.isDragging) {
-            const sel = selectedItem();
-            if (sel) {
-                let newX = pos.x - state.ui.dragOffset.x;
-                let newY = pos.y - state.ui.dragOffset.y;
+        const sel = selectedItem();
+        state.ui.snapLines = [];
 
-                if (!e.shiftKey && sel.type !== 'source') {
-                    const snapDist = 15 / state.ui.zoom;
-                    
-                    let snapDx = 0, snapDy = 0;
-                    let bestX = snapDist, bestY = snapDist;
-                    
-                    let ptSnapDx = 0, ptSnapDy = 0;
-                    let bestPt = snapDist;
-                    let hasPtSnap = false;
+        if (state.ui.dragAction && sel) {
+            if (state.ui.dragAction === 'rotate') {
+                const cx = sel.x + (sel.w ? sel.w / 2 : 0);
+                const cy = sel.y + (sel.h ? sel.h / 2 : 0);
+                let a = Math.atan2(pos.y - cy, pos.x - cx) * 180 / Math.PI + 90;
+                if (e.shiftKey) a = Math.round(a / 15) * 15;
+                sel.angle = (a + 360) % 360;
+            } else if (state.ui.dragAction.startsWith('resize')) {
+                const cx = sel.x + sel.w / 2;
+                const cy = sel.y + sel.h / 2;
+                const rad = -sel.angle * Math.PI / 180;
+                const dx = pos.x - cx;
+                const dy = pos.y - cy;
+                const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
+                sel.w = Math.max(2, Math.abs(lx) * 2);
+                sel.h = Math.max(2, Math.abs(ly) * 2);
+                sel.x = cx - sel.w / 2;
+                sel.y = cy - sel.h / 2;
+            }
+            markDirty('canvas', 'heatmap', 'ui', 'inspector');
+            return;
+        }
 
-                    const getPoints = (cx, cy, w, h, angle) => {
-                        const rad = angle * Math.PI / 180;
-                        const cos = Math.cos(rad), sin = Math.sin(rad);
-                        const hw = w / 2, hh = h / 2;
-                        return [
-                            { x: cx, y: cy },
-                            { x: cx + hw * cos - hh * sin, y: cy + hw * sin + hh * cos },
-                            { x: cx - hw * cos - hh * sin, y: cy - hw * sin + hh * cos },
-                            { x: cx - hw * cos + hh * sin, y: cy - hw * sin - hh * cos },
-                            { x: cx + hw * cos + hh * sin, y: cy + hw * sin - hh * cos },
-                            { x: cx + hw * cos, y: cy + hw * sin },
-                            { x: cx - hw * cos, y: cy - hw * sin },
-                            { x: cx - hh * sin, y: cy + hh * cos },
-                            { x: cx + hh * sin, y: cy - hh * cos }
-                        ];
-                    };
+        if (state.ui.isDragging && sel) {
+            let newX = pos.x - state.ui.dragOffset.x;
+            let newY = pos.y - state.ui.dragOffset.y;
 
-                    for (const other of state.doc.items) {
-                        if (other.id === sel.id || other.type === 'source') continue;
+            if (!e.shiftKey && sel.type !== 'source') {
+                const snapDist = 15 / state.ui.zoom;
+                
+                let snapDx = 0, snapDy = 0;
+                let bestX = snapDist, bestY = snapDist;
+                
+                let ptSnapDx = 0, ptSnapDy = 0;
+                let bestPt = snapDist;
+                let hasPtSnap = false;
 
-                        const w1 = sel.w || 0, h1 = sel.h || 0;
-                        const w2 = other.w || 0, h2 = other.h || 0;
+                const getPoints = (cx, cy, w, h, angle) => {
+                    const r = angle * Math.PI / 180;
+                    const cos = Math.cos(r), sin = Math.sin(r);
+                    const hw = w / 2, hh = h / 2;
+                    return [
+                        { x: cx, y: cy },
+                        { x: cx + hw * cos - hh * sin, y: cy + hw * sin + hh * cos },
+                        { x: cx - hw * cos - hh * sin, y: cy - hw * sin + hh * cos },
+                        { x: cx - hw * cos + hh * sin, y: cy - hw * sin - hh * cos },
+                        { x: cx + hw * cos + hh * sin, y: cy + hw * sin - hh * cos },
+                        { x: cx + hw * cos, y: cy + hw * sin },
+                        { x: cx - hw * cos, y: cy - hw * sin },
+                        { x: cx - hh * sin, y: cy + hh * cos },
+                        { x: cx + hh * sin, y: cy - hh * cos }
+                    ];
+                };
 
-                        // Orthogonal edge snapping
-                        if (sel.angle % 90 === 0 && other.angle % 90 === 0) {
-                            const ew1 = sel.angle % 180 === 0 ? w1 : h1;
-                            const eh1 = sel.angle % 180 === 0 ? h1 : w1;
-                            const ew2 = other.angle % 180 === 0 ? w2 : h2;
-                            const eh2 = other.angle % 180 === 0 ? h2 : w2;
+                for (const other of state.doc.items) {
+                    if (other.id === sel.id || other.type === 'source') continue;
 
-                            const xs = [other.x - ew2/2 + ew1/2, other.x + ew2/2 - ew1/2, other.x - ew2/2 - ew1/2, other.x + ew2/2 + ew1/2, other.x];
-                            const ys = [other.y - eh2/2 + eh1/2, other.y + eh2/2 - eh1/2, other.y - eh2/2 - eh1/2, other.y + eh2/2 + eh1/2, other.y];
+                    const w1 = sel.w || 0, h1 = sel.h || 0;
+                    const w2 = other.w || 0, h2 = other.h || 0;
 
-                            for (const sx of xs) {
-                                const d = Math.abs(sx - newX);
-                                if (d < bestX) { bestX = d; snapDx = sx - newX; }
-                            }
-                            for (const sy of ys) {
-                                const d = Math.abs(sy - newY);
-                                if (d < bestY) { bestY = d; snapDy = sy - newY; }
-                            }
+                    // Orthogonal edge snapping
+                    if (sel.angle % 90 === 0 && other.angle % 90 === 0) {
+                        const ew1 = sel.angle % 180 === 0 ? w1 : h1;
+                        const eh1 = sel.angle % 180 === 0 ? h1 : w1;
+                        const ew2 = other.angle % 180 === 0 ? w2 : h2;
+                        const eh2 = other.angle % 180 === 0 ? h2 : w2;
+
+                        const xs = [other.x - ew2/2 + ew1/2, other.x + ew2/2 - ew1/2, other.x - ew2/2 - ew1/2, other.x + ew2/2 + ew1/2, other.x];
+                        const ys = [other.y - eh2/2 + eh1/2, other.y + eh2/2 - eh1/2, other.y - eh2/2 - eh1/2, other.y + eh2/2 + eh1/2, other.y];
+
+                        for (const sx of xs) {
+                            const d = Math.abs(sx - newX);
+                            if (d < bestX) { bestX = d; snapDx = sx - newX; }
                         }
-
-                        // Universal point snapping (handles corners and midpoints of ANY rotation)
-                        const pts1 = getPoints(newX, newY, w1, h1, sel.angle);
-                        const pts2 = getPoints(other.x, other.y, w2, h2, other.angle);
-
-                        for (const p1 of pts1) {
-                            for (const p2 of pts2) {
-                                const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                                if (dist < bestPt) {
-                                    bestPt = dist;
-                                    ptSnapDx = p2.x - p1.x;
-                                    ptSnapDy = p2.y - p1.y;
-                                    hasPtSnap = true;
-                                }
-                            }
+                        for (const sy of ys) {
+                            const d = Math.abs(sy - newY);
+                            if (d < bestY) { bestY = d; snapDy = sy - newY; }
                         }
                     }
 
-                    // Apply the best snap available
-                    if (hasPtSnap && bestPt <= Math.min(bestX, bestY)) {
-                        newX += ptSnapDx;
-                        newY += ptSnapDy;
-                    } else {
-                        if (bestX < snapDist) newX += snapDx;
-                        if (bestY < snapDist) newY += snapDy;
+                    // Universal point snapping
+                    const pts1 = getPoints(newX + w1/2, newY + h1/2, w1, h1, sel.angle);
+                    const pts2 = getPoints(other.x + w2/2, other.y + h2/2, w2, h2, other.angle);
+
+                    for (const p1 of pts1) {
+                        for (const p2 of pts2) {
+                            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                            if (dist < bestPt) {
+                                bestPt = dist;
+                                ptSnapDx = p2.x - p1.x;
+                                ptSnapDy = p2.y - p1.y;
+                                hasPtSnap = true;
+                            }
+                        }
                     }
                 }
 
-                sel.x = newX;
-                sel.y = newY;
-                markDirty('canvas', 'heatmap');
+                if (hasPtSnap && bestPt <= Math.min(bestX, bestY)) {
+                    newX += ptSnapDx;
+                    newY += ptSnapDy;
+                    state.ui.snapLines.push({ x1: newX + sel.w/2 + ptSnapDx - 100, y1: newY + sel.h/2 + ptSnapDy, x2: newX + sel.w/2 + ptSnapDx + 100, y2: newY + sel.h/2 + ptSnapDy });
+                    state.ui.snapLines.push({ x1: newX + sel.w/2 + ptSnapDx, y1: newY + sel.h/2 + ptSnapDy - 100, x2: newX + sel.w/2 + ptSnapDx, y2: newY + sel.h/2 + ptSnapDy + 100 });
+                } else {
+                    if (bestX < snapDist) {
+                        newX += snapDx;
+                        state.ui.snapLines.push({ x1: newX + sel.w/2, y1: -9999, x2: newX + sel.w/2, y2: 9999 });
+                    }
+                    if (bestY < snapDist) {
+                        newY += snapDy;
+                        state.ui.snapLines.push({ x1: -9999, y1: newY + sel.h/2, x2: 9999, y2: newY + sel.h/2 });
+                    }
+                }
             }
+
+            sel.x = newX;
+            sel.y = newY;
+            markDirty('canvas', 'heatmap', 'ui');
         }
     }
 
@@ -2194,9 +2124,11 @@
             return;
         }
         state.ui.isDragging = false;
+        state.ui.dragAction = null;
+        state.ui.snapLines = [];
         state.ui.rulerStart = null;
         state.ui.rulerEnd = null;
-        markDirty('canvas');
+        markDirty('canvas', 'ui');
     }
 
     function duplicateSelected() {
@@ -2208,7 +2140,7 @@
         copy.x += 20; copy.y += 20;
         state.doc.items.push(copy);
         state.ui.selectedId = copy.id;
-        markDirty('canvas', 'heatmap', 'inspector');
+        markDirty('canvas', 'heatmap', 'inspector', 'ui');
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2252,7 +2184,7 @@
                 };
                 state.ui.selectedId = null;
                 syncGlobalInputs();
-                markDirty('canvas', 'heatmap', 'inspector');
+                markDirty('canvas', 'heatmap', 'inspector', 'ui');
                 toast('Project loaded');
             } catch (err) {
                 toast('Failed to load project: invalid file', true);
@@ -2812,7 +2744,7 @@
             state.doc[prop] = parsed;
             if (num && num.value != parsed) num.value = parsed;
             if (slider && slider.value != parsed) slider.value = parsed;
-            markDirty('canvas', dirtyFlag);
+            markDirty('canvas', dirtyFlag, 'ui');
         };
         num.addEventListener('input', () => apply(num.value));
         if (slider) slider.addEventListener('input', () => apply(slider.value));
@@ -2822,7 +2754,7 @@
         const sel = document.getElementById(id);
         sel.addEventListener('change', () => {
             state.doc[prop] = sel.value;
-            markDirty('canvas', 'heatmap');
+            markDirty('canvas', 'heatmap', 'ui');
         });
     }
 
@@ -2845,7 +2777,7 @@
             state.doc.scale = newScale;
             if (num.value    != newScale) num.value    = newScale;
             if (slider.value != newScale) slider.value = newScale;
-            markDirty('canvas', 'heatmap');
+            markDirty('canvas', 'heatmap', 'ui');
         };
         num.addEventListener('input',    () => apply(num.value));
         slider.addEventListener('input', () => apply(slider.value));
@@ -2884,7 +2816,7 @@
         document.documentElement.classList.toggle('light', theme === 'light');
         document.getElementById('themeIcon').innerHTML = THEME_ICONS[theme];
         refreshCanvasColors();
-        markDirty('canvas', 'heatmap');
+        markDirty('canvas', 'heatmap', 'ui');
     }
 
     function initialTheme() {
@@ -3103,7 +3035,7 @@
             pushHistory();
             state.doc.items = [];
             state.ui.selectedId = null;
-            markDirty('canvas', 'heatmap', 'inspector');
+            markDirty('canvas', 'heatmap', 'inspector', 'ui');
         });
         document.getElementById('undoBtn').addEventListener('click', undo);
         document.getElementById('redoBtn').addEventListener('click', redo);
@@ -3147,12 +3079,12 @@
                     pushHistory();
                     state.doc.items = state.doc.items.filter(i => i !== sel);
                     state.ui.selectedId = null;
-                    markDirty('canvas', 'heatmap', 'inspector');
+                    markDirty('canvas', 'heatmap', 'inspector', 'ui');
                 }
             } else if (e.key === 'Escape') {
                 state.ui.selectedId = null;
                 setMode('select');
-                markDirty('canvas', 'inspector');
+                markDirty('canvas', 'inspector', 'ui');
             } else if (e.key === ' ') {
                 e.preventDefault();
                 state.ui.spaceDown = true;
@@ -3174,6 +3106,7 @@
 
         resize();
         setMode('select');
+        updateDomUI();
         requestAnimationFrame(renderLoop);
     }
 
@@ -3236,7 +3169,7 @@
                 <p class="help-p">Set scale before placing anything — it cannot be changed without manually repositioning all items.</p>
                 <p class="help-p">Upload your site map and lower the Map Opacity slider until the heatmap colours read clearly through it.</p>
                 <p class="help-p">Place speakers first, then add zones to see SPL readings in context. The schedule panel updates in real time as you drag elements.</p>
-                <p class="help-p">Low band (125 Hz) is almost always the compliance concern. Check this view for camping areas and any residential boundaries near the site.</p>
+                <p class="help-p">Low band (125 Hz) is almost always the compliance concern. Check this view for camping areas and residential boundaries near the site.</p>
                 <p class="help-p">Save the project JSON at the end of each session — it preserves all placements, settings, and event details for the next review or handoff.</p>
             </div>
         </div>
