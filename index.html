@@ -520,7 +520,7 @@
 
                         <div>
                             <div class="flex justify-between items-center mb-1.5">
-                                <label class="field-label" style="margin-bottom:0">Map opacity</label>
+                                <label class="field-label" id="mapVeilLabel" style="margin-bottom:0">Map opacity</label>
                                 <input type="number" id="brightnessInput" min="0" max="100" value="40" class="input mono" style="width:56px;padding:2px 6px;font-size:11px;">
                             </div>
                             <input type="range" id="brightnessSlider" min="0" max="100" value="40">
@@ -1571,6 +1571,20 @@
         const { width, height } = state.ui;
         ctx.clearRect(0, 0, width, height);
         renderBackground();
+
+        // Veil — semi-transparent wash between satellite tiles and heatmap.
+        // mapOpacity slider is repurposed: 0 = full satellite, 100 = satellite hidden.
+        if (state.ui.mapMode) {
+            const veil = state.doc.mapOpacity / 100;
+            if (veil > 0) {
+                const isDark = !document.documentElement.classList.contains('light');
+                ctx.fillStyle = isDark
+                    ? `rgba(0,0,0,${veil})`
+                    : `rgba(255,255,255,${veil})`;
+                ctx.fillRect(0, 0, width, height);
+            }
+        }
+
         if (dirty.heatmap) renderHeatmap();
         ctx.drawImage(offscreenHeatmap, 0, 0);
 
@@ -2146,7 +2160,98 @@
         e.target.value = '';
     }
 
-    function exportPNG() {
+    // Fetch and draw Esri satellite tiles onto the export canvas.
+    // Tiles are requested with crossOrigin='anonymous' — Esri's public imagery
+    // service sends Access-Control-Allow-Origin:* so canvas capture is permitted.
+    async function drawSatelliteTilesExport(tCtx, eW, mapH, hH, factor) {
+        const scale              = state.doc.scale;
+        const metersPerWorldPx   = 1 / scale;
+        const originProj         = L.CRS.EPSG3857.project(geoOrigin);
+
+        // World coords → Leaflet LatLng
+        function worldToLL(wx, wy) {
+            const pt = L.point(
+                originProj.x + wx * metersPerWorldPx,
+                originProj.y - wy * metersPerWorldPx
+            );
+            return L.CRS.EPSG3857.unproject(pt);
+        }
+
+        // Leaflet LatLng → world coords
+        function llToWorld(ll) {
+            const pt = L.CRS.EPSG3857.project(ll);
+            return {
+                x: (pt.x - originProj.x) / metersPerWorldPx,
+                y: -(pt.y - originProj.y) / metersPerWorldPx
+            };
+        }
+
+        // The export always covers world (0,0) → (worldW, worldH)
+        const worldW   = eW / factor;
+        const worldH   = mapH / factor;
+        const tlLatLng = worldToLL(0, 0);
+        const brLatLng = worldToLL(worldW, worldH);
+
+        // Choose tile zoom: highest that Esri serves at (≤19) and covers sensibly
+        const lat0         = geoOrigin.lat;
+        const exportMPP    = metersPerWorldPx / factor;           // m per export px
+        const idealZoom    = Math.log2(
+            156543.03392 * Math.cos(lat0 * Math.PI / 180) / exportMPP
+        );
+        const tileZoom     = Math.min(19, Math.max(14, Math.round(idealZoom)));
+        const tileMPP      = 156543.03392 * Math.cos(lat0 * Math.PI / 180) / Math.pow(2, tileZoom);
+        const tileExportSz = 256 * tileMPP / exportMPP;          // export px per tile
+
+        // Lat/lng → integer tile coords at zoom z
+        function llToTileXY(ll, z) {
+            const n      = Math.pow(2, z);
+            const latRad = ll.lat * Math.PI / 180;
+            return {
+                x: Math.floor((ll.lng + 180) / 360 * n),
+                y: Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+            };
+        }
+
+        // Top-left lat/lng of a tile
+        function tileTopLeft(tx, ty, z) {
+            const n   = Math.pow(2, z);
+            const lng = tx / n * 360 - 180;
+            const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
+            return L.latLng(lat, lng);
+        }
+
+        const tlTile = llToTileXY(tlLatLng, tileZoom);
+        const brTile = llToTileXY(brLatLng, tileZoom);
+
+        // Fetch all needed tiles in parallel
+        const promises = [];
+        for (let tx = tlTile.x; tx <= brTile.x; tx++) {
+            for (let ty = tlTile.y; ty <= brTile.y; ty++) {
+                const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tileZoom}/${ty}/${tx}`;
+                promises.push(new Promise(resolve => {
+                    const img      = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload     = () => resolve({ img, tx, ty });
+                    img.onerror    = () => resolve(null);
+                    img.src        = url;
+                }));
+            }
+        }
+
+        const tiles = await Promise.all(promises);
+
+        for (const tile of tiles) {
+            if (!tile) continue;
+            const { img, tx, ty } = tile;
+            const tileLL    = tileTopLeft(tx, ty, tileZoom);
+            const tileWorld = llToWorld(tileLL);
+            const ex        = tileWorld.x * factor;
+            const ey        = hH + tileWorld.y * factor;
+            tCtx.drawImage(img, ex, ey, tileExportSz, tileExportSz);
+        }
+    }
+
+    async function exportPNG() {
         const { width, height } = state.ui;
         const zones   = state.doc.items.filter(i => i.type !== 'source');
         const sources = state.doc.items.filter(i => i.type === 'source');
@@ -2219,8 +2324,19 @@
         tCtx.fillStyle = bg;
         tCtx.fillRect(0, hH, eW, mapH);
 
-        // Background map image
-        if (state.ui.backgroundImage) {
+        // ── SATELLITE TILES ───────────────────────────────────────────────
+        if (state.ui.mapMode && leafletMap && geoOrigin) {
+            toast('Fetching satellite tiles…');
+            await drawSatelliteTilesExport(tCtx, eW, mapH, hH, factor);
+            // Veil over satellite
+            const veil = state.doc.mapOpacity / 100;
+            if (veil > 0) {
+                const isDark = !document.documentElement.classList.contains('light');
+                tCtx.fillStyle = isDark ? `rgba(0,0,0,${veil})` : `rgba(255,255,255,${veil})`;
+                tCtx.fillRect(0, hH, eW, mapH);
+            }
+        } else if (state.ui.backgroundImage) {
+            // Background map image
             const img = state.ui.backgroundImage;
             const r   = img.width / img.height;
             let dw = eW, dh = eW / r;
@@ -2768,6 +2884,7 @@
             mapDiv.style.display = '';
             btn.classList.add('active');
             section.style.display = '';
+            document.getElementById('mapVeilLabel').textContent = 'Map veil';
 
             if (!leafletMap) {
                 initLeafletMap();
@@ -2784,6 +2901,7 @@
             mapDiv.style.display = 'none';
             btn.classList.remove('active');
             section.style.display = 'none';
+            document.getElementById('mapVeilLabel').textContent = 'Map opacity';
             markDirty('canvas', 'heatmap');
         }
     }
