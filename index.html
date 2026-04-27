@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Site Planner</title>
+    <title>SPL Architect</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -195,7 +195,6 @@
             color: var(--text-2);
         }
         .btn-ghost:hover { color: var(--text-1); background: var(--surface-2); }
-        .btn-icon { padding: 6px; }
 
         /* ─── Tool buttons (sidebar grid) ──────────────────────────────── */
         .tool {
@@ -340,18 +339,20 @@
         /* ─── Help modal ───────────────────────────────────────────────── */
         .modal-overlay {
             position: fixed; inset: 0; z-index: 200;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(2px);
+            background: rgba(0,0,0,0.65);
             display: none;
         }
         .modal-overlay.open { display: flex; justify-content: flex-end; }
         .modal-panel {
-            width: 420px; height: 100%;
+            width: 420px; max-width: 100%; height: 100%;
             background: var(--surface);
             border-left: 1px solid var(--border);
             overflow-y: auto; scrollbar-width: thin;
             scrollbar-color: var(--border-strong) transparent;
             display: flex; flex-direction: column;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            will-change: transform;
         }
         .modal-panel::-webkit-scrollbar { width: 6px; }
         .modal-panel::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
@@ -421,7 +422,7 @@
     <header class="hairline-b px-4 h-12 flex justify-between items-center shrink-0" style="background: var(--surface);">
         <div class="flex items-center gap-4">
             <div class="wordmark">
-                <span class="dot"></span>Acoustic Site Planner<span class="sub mono">v2</span>
+                <span class="dot"></span>SPL Architect<span class="sub mono">v2</span>
             </div>
         </div>
 
@@ -443,26 +444,32 @@
 
             <div class="w-px h-5 mx-1" style="background: var(--border);"></div>
 
-            <button id="undoBtn" class="btn btn-ghost btn-icon" title="Undo (⌘Z)">
+            <button id="undoBtn" class="btn btn-ghost" title="Undo (⌘Z)">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.7 3L3 13"/></svg>
+                Undo
             </button>
-            <button id="redoBtn" class="btn btn-ghost btn-icon" title="Redo (⌘⇧Z)">
+            <button id="redoBtn" class="btn btn-ghost" title="Redo (⌘⇧Z)">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3L21 13"/></svg>
+                Redo
             </button>
-            <button id="clearBtn" class="btn btn-ghost btn-icon" title="Clear all">
+            <button id="clearBtn" class="btn btn-ghost" title="Clear all">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+                Clear
             </button>
 
             <div class="w-px h-5 mx-1" style="background: var(--border);"></div>
 
-            <button id="themeBtn" class="btn btn-ghost btn-icon" title="Toggle theme">
+            <button id="themeBtn" class="btn btn-ghost" title="Toggle theme">
                 <svg id="themeIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                Theme
             </button>
-            <button id="satelliteBtn" class="btn btn-ghost btn-icon" title="Satellite map (Esri / Leaflet)">
+            <button id="satelliteBtn" class="btn btn-ghost" title="Satellite map (Esri / Leaflet)">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><use href="#i-satellite"/></svg>
+                Satellite
             </button>
-            <button id="helpBtn" class="btn btn-ghost btn-icon" title="How to use">
+            <button id="helpBtn" class="btn btn-ghost" title="How to use">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Help
             </button>
             <button id="downloadBtn" class="btn btn-primary" title="Export PNG">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -875,7 +882,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 4. ACOUSTICS (pure — unchanged math, just reformatted)
+    // 4. ACOUSTICS
     // ═══════════════════════════════════════════════════════════════════════
 
     function isPointInItem(px, py, item) {
@@ -950,18 +957,14 @@
         return false;
     }
 
-    // Per-source band output — bassBias skews energy between frequency bands.
-    // Weights always sum to 1.0 so broadband total power is conserved.
     function getSourceBandDb(source, band) {
-        const low  = 0.15 + (source.bassBias / 100) * 0.35;  // 0.15–0.50
-        const high = 0.20 + (1 - source.bassBias / 100) * 0.30; // 0.20–0.50
+        const low  = 0.15 + (source.bassBias / 100) * 0.35;
+        const high = 0.20 + (1 - source.bassBias / 100) * 0.30;
         const mid  = Math.max(0.01, 1 - low - high);
         const w = band === 'low' ? low : band === 'high' ? high : mid;
         return source.db + 10 * Math.log10(Math.max(w, 0.001));
     }
 
-    // Atmospheric absorption coefficient (dB per 50 m), increases with frequency.
-    // Approximation of ISO 9613-1 at 20°C, 70% RH, representative outdoor conditions.
     function getAirAbsorption(band) {
         if (band === 'high') return 0.9;
         if (band === 'mid')  return 0.45;
@@ -969,34 +972,22 @@
         return 0;
     }
 
-    // Maekawa barrier insertion loss (dB).
-    // N  = Fresnel number = 2 * f * pathDiff / c
-    // IL = 10 * log10(3 + 20N), capped at 25 dB (diffraction limit).
-    // pathDiff is the extra path length (m) sound must travel over the barrier top.
-    // Approximated here as h²/(2d) for normal incidence — valid when d >> h.
     function maekawaIL(freq, hEff, distM) {
         const pathDiff = (hEff * hEff) / (2 * Math.max(1, distM));
         const N = 2 * freq * pathDiff / 343;
         return Math.min(25, 10 * Math.log10(3 + 20 * Math.max(0, N)));
     }
 
-    // Core intensity calculation.
-    // All three bands are computed in a single obstacle-loop pass, which is
-    // cheaper for broadband than the previous three-recursive-call approach and
-    // frees budget for the Maekawa formula inside the same loop.
     function calculateIntensity(s, tx, ty, obstacles, band) {
         const { scale, windSpeed, windDir } = state.doc;
         const distM  = Math.max(0.1, Math.hypot(s.x - tx, s.y - ty) / scale);
         const log10d = Math.log10(distM);
         const ge     = GROUND_EFFECT[state.doc.groundType] ?? { low: 0, mid: 0, high: 0 };
 
-        // Base SPL per band = source level − ISL − air absorption − ground effect
         let dbL = getSourceBandDb(s, 'low')  - 20*log10d - getAirAbsorption('low')  * distM/50 - ge.low;
         let dbM = getSourceBandDb(s, 'mid')  - 20*log10d - getAirAbsorption('mid')  * distM/50 - ge.mid;
         let dbH = getSourceBandDb(s, 'high') - 20*log10d - getAirAbsorption('high') * distM/50 - ge.high;
 
-        // Wind: uniform across bands at this level of modelling.
-        // wR uses compass convention: 0=N, 90=E, 180=S, 270=W → offset by −90° into canvas coords.
         if (windSpeed > 0) {
             const aP  = Math.atan2(ty - s.y, tx - s.x);
             const wR  = (windDir - 90) * (Math.PI / 180);
@@ -1004,8 +995,6 @@
             dbL += adj; dbM += adj; dbH += adj;
         }
 
-        // Beam directivity — smooth linear rolloff beyond the cone edge.
-        // Avoids the hard 20 dB step of the previous model.
         if (s.beam < 360) {
             const aP  = Math.atan2(ty - s.y, tx - s.x) * (180 / Math.PI);
             let diff  = Math.abs(aP - s.angle) % 360;
@@ -1017,11 +1006,10 @@
             }
         }
 
-        // Obstacle attenuation — geometry computed once, applied to all bands.
         for (const o of obstacles) {
             const m = MATERIAL_PRESETS[o.material];
             if (m.type === 'canopy') continue;
-            if (o.isExclusion) continue;  // exclusion zones are map markers only
+            if (o.isExclusion) continue;
             const sIn = isPointInItem(s.x, s.y, o);
             const tIn = isPointInItem(tx, ty, o);
             if (m.type === 'shell' && sIn && tIn) continue;
@@ -1033,16 +1021,12 @@
                 : 1.0;
 
             if (o.vHeight > 0.5) {
-                // Tall barrier: Maekawa insertion loss, frequency-dependent.
-                // hEff = effective barrier height above the source–receiver line of sight.
                 const hEff  = Math.max(0, o.vHeight - s.vHeight * 0.5);
                 const block = (o.reflection / 100) * diffra;
                 dbL -= maekawaIL(BAND_FREQ.low,  hEff, distM) * block;
                 dbM -= maekawaIL(BAND_FREQ.mid,  hEff, distM) * block;
                 dbH -= maekawaIL(BAND_FREQ.high, hEff, distM) * block;
             } else {
-                // Thin/flat surface: frequency-dependent absorption.
-                // High frequencies are absorbed significantly more than low.
                 const absBase = (o.absorption / 100) * (iL / scale) * 10;
                 dbL -= absBase * 0.55;
                 dbM -= absBase * 1.0;
@@ -1066,7 +1050,6 @@
         for (const s of sources) {
             total += calculateIntensity(s, x, y, obstacles, band);
 
-            // Image-source reflections — surfaces with meaningful reflection only
             for (const o of obstacles) {
                 const m = MATERIAL_PRESETS[o.material];
                 if (m.type === 'vol' || (o.reflection ?? 0) < 30) continue;
@@ -1075,7 +1058,6 @@
                 const reflCoeff = Math.min(0.99, o.reflection / 100);
                 const reflLoss  = -10 * Math.log10(1 - reflCoeff);
                 const srcDb     = (band === 'broadband') ? s.db : getSourceBandDb(s, band);
-                // BUG FIX: was `20 * distM` (treating metres as dB) — now correct ISL
                 const db        = srcDb - 20 * Math.log10(distM) - reflLoss;
                 if (isReflectionValid(s, { x, y }, o)) {
                     total += Math.pow(10, db / 10);
@@ -1136,7 +1118,6 @@
     const offscreenHeatmap = document.createElement('canvas');
     const offCtx = offscreenHeatmap.getContext('2d');
 
-    // Checkerboard pattern cache — keyed by color, created once per unique color.
     const _checkerCache = {};
     function makeCheckerPattern(targetCtx, color, size = 7) {
         const key = color + size;
@@ -1188,8 +1169,6 @@
         if (!state.ui.backgroundImage) return;
         const img = state.ui.backgroundImage;
         const { width, height } = state.ui;
-        // Image lives in world space — fit it to the home viewport dimensions
-        // (what fills the screen at zoom=1, pan=0) so it pans/zooms with everything.
         const r = img.width / img.height;
         let dw = width, dh = width / r;
         if (r < width / height) { dh = height; dw = height * r; }
@@ -1202,7 +1181,6 @@
         ctx.restore();
     }
 
-    // Schedule panel — now a clean data table, no glow, no gradient border.
     function renderSchedule() {
         const zones = state.doc.items.filter(i => i.type !== 'source');
         if (!zones.length) return;
@@ -1217,14 +1195,12 @@
         ctx.save();
         ctx.translate(width - panelW - pad, pad);
 
-        // Panel
         ctx.fillStyle = canvasColors.surface;
         ctx.fillRect(0, 0, panelW, panelH);
         ctx.strokeStyle = canvasColors.border;
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, 0.5, panelW - 1, panelH - 1);
 
-        // Header
         ctx.fillStyle = canvasColors.text3;
         ctx.font = '500 10px Inter';
         ctx.textBaseline = 'middle';
@@ -1234,7 +1210,6 @@
         ctx.fillText('SPL', panelW - 12, headerH / 2);
         ctx.textAlign = 'start';
 
-        // Divider
         ctx.strokeStyle = canvasColors.border;
         ctx.beginPath();
         ctx.moveTo(0, headerH);
@@ -1247,7 +1222,6 @@
             const isExclusion = o.isExclusion;
             const dbV = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
 
-            // Zone colour dot — use customColor when set
             const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
             const zoneColor = o.customColor ?? cfg.color;
             ctx.fillStyle = zoneColor;
@@ -1255,12 +1229,10 @@
             ctx.arc(18, y, 3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Label
             ctx.fillStyle = canvasColors.text1;
             ctx.font = '500 11px Inter';
             ctx.fillText(o.label, 28, y);
 
-            // Material column
             ctx.fillStyle = (isCanopy || isExclusion) ? canvasColors.text3 : canvasColors.text2;
             ctx.font = '400 10px Inter';
             ctx.fillText(
@@ -1268,7 +1240,6 @@
                 130, y
             );
 
-            // SPL column
             ctx.font = '500 11px "JetBrains Mono"';
             ctx.textAlign = 'right';
             if (isCanopy || isExclusion) {
@@ -1285,43 +1256,35 @@
         ctx.textBaseline = 'alphabetic';
     }
 
-    // Legend — slim vertical strip, ticks + labels. No black card.
     function renderLegend() {
-        const { height } = state.ui;
         const pad = 16;
         const stripW = 6;
         const stripH = 180;
-        const labelW = 28;
         const scheme = INTENSITY_SCHEMES[state.doc.scheme];
 
         ctx.save();
         ctx.translate(pad, pad);
 
-        // Label
         ctx.fillStyle = canvasColors.text3;
         ctx.font = '500 10px Inter';
         ctx.textBaseline = 'alphabetic';
         ctx.fillText('SPL (dB)', 0, 10);
 
-        // Colour strip
         const stripY = 20;
         for (let i = 0; i < stripH; i += 2) {
             const db = 30 + ((stripH - i) / stripH) * 100;
             ctx.fillStyle = scheme(db, 0.85);
             ctx.fillRect(0, stripY + i, stripW, 2);
         }
-        // Strip outline
         ctx.strokeStyle = canvasColors.border;
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, stripY + 0.5, stripW - 1, stripH - 1);
 
-        // Tick labels every 20dB
         ctx.fillStyle = canvasColors.text2;
         ctx.font = '400 10px "JetBrains Mono"';
         ctx.textBaseline = 'middle';
         for (let db = 30; db <= 130; db += 20) {
             const y = stripY + stripH - ((db - 30) / 100) * stripH;
-            // Tick
             ctx.strokeStyle = canvasColors.border;
             ctx.beginPath();
             ctx.moveTo(stripW, y);
@@ -1334,7 +1297,6 @@
         ctx.textBaseline = 'alphabetic';
     }
 
-    // Calibration bar — map-style scale bar, end caps, "10 m" label.
     function renderCalibrationBar() {
         const { width, height } = state.ui;
         const pad = 16;
@@ -1343,7 +1305,6 @@
         const x = width - barW - pad;
         const y = height - pad - barH - 14;
 
-        // Bar with alternating segments (like a map scale)
         const segments = 5;
         const segW = barW / segments;
         for (let i = 0; i < segments; i++) {
@@ -1354,13 +1315,11 @@
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, y + 0.5, barW - 1, barH - 1);
 
-        // End ticks
         ctx.beginPath();
         ctx.moveTo(x + 0.5, y - 2); ctx.lineTo(x + 0.5, y + barH + 2);
         ctx.moveTo(x + barW - 0.5, y - 2); ctx.lineTo(x + barW - 0.5, y + barH + 2);
         ctx.stroke();
 
-        // Label
         ctx.fillStyle = canvasColors.text2;
         ctx.font = '400 10px "JetBrains Mono"';
         ctx.textAlign = 'center';
@@ -1374,7 +1333,6 @@
         const end = state.ui.rulerEnd;
         if (!start || !end) return;
 
-        // Ruler stored in world coords — convert to screen for drawing
         const ss = worldToScreen(start.x, start.y);
         const se = worldToScreen(end.x, end.y);
         const dist = Math.hypot(end.x - start.x, end.y - start.y) / state.doc.scale;
@@ -1425,7 +1383,6 @@
         ctx.rotate(item.angle * Math.PI / 180);
 
         if (item.type === 'source') {
-            // Dispersion cone — very subtle, amber tinted
             if (item.beam < 360) {
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
@@ -1437,12 +1394,10 @@
                     ? 'rgba(232, 165, 71, 0.15)'
                     : 'rgba(232, 165, 71, 0.08)';
                 ctx.fill();
-                // Cone edge
                 ctx.strokeStyle = sel ? canvasColors.accent : 'rgba(232, 165, 71, 0.3)';
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
-            // Speaker body — amber filled circle with forward tick
             ctx.beginPath();
             ctx.arc(0, 0, 7, 0, Math.PI * 2);
             ctx.fillStyle = canvasColors.accent;
@@ -1459,8 +1414,6 @@
             ctx.strokeStyle = canvasColors.text1;
             ctx.stroke();
 
-            // Canopy indicator — dashed ring + zone-colour label when speaker sits
-            // inside a stretch-tent / canopy zone (which passes sound through).
             const canopy = getCanopyForSource(item);
             if (canopy) {
                 const cc = ZONE_CONFIG[canopy.type]?.color ?? canvasColors.text2;
@@ -1481,8 +1434,6 @@
                 ctx.restore();
             }
 
-            // Speaker label — counter-rotated so it always reads upright.
-            // Shown above the canopy ring if present, otherwise above the dot.
             if (item.label) {
                 ctx.save();
                 ctx.rotate(-item.angle * Math.PI / 180);
@@ -1490,7 +1441,6 @@
                 ctx.font = '600 9px Inter';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'alphabetic';
-                // Pill background for contrast over heatmap
                 const tw = ctx.measureText(item.label).width;
                 const ph = 11, pPad = 4;
                 ctx.fillStyle = canvasColors.surface;
@@ -1506,7 +1456,6 @@
             const cfg = ZONE_CONFIG[item.type] || { color: canvasColors.text3 };
             const zoneColor = item.customColor ?? cfg.color;
 
-            // Fill — checkerboard for exclusion zones, subtle tint otherwise
             if (item.isExclusion) {
                 ctx.fillStyle = makeCheckerPattern(ctx, zoneColor);
                 ctx.fillRect(-w / 2, -h / 2, w, h);
@@ -1515,37 +1464,28 @@
                 ctx.fillRect(-w / 2, -h / 2, w, h);
             }
 
-            // Border — thicker + accent when selected, otherwise zone colour
             ctx.strokeStyle = sel ? canvasColors.accent : zoneColor;
             ctx.lineWidth = sel ? 2 : (item.isExclusion ? 1.75 : 1.25);
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-            // Corner marks (selection indicator — more CAD-like than a glow)
             if (sel) {
-                const cs = 6;  // corner size
+                const cs = 6;
                 ctx.strokeStyle = canvasColors.accent;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                // TL
                 ctx.moveTo(-w/2, -h/2 + cs); ctx.lineTo(-w/2, -h/2); ctx.lineTo(-w/2 + cs, -h/2);
-                // TR
                 ctx.moveTo(w/2 - cs, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2, -h/2 + cs);
-                // BR
                 ctx.moveTo(w/2, h/2 - cs); ctx.lineTo(w/2, h/2); ctx.lineTo(w/2 - cs, h/2);
-                // BL
                 ctx.moveTo(-w/2 + cs, h/2); ctx.lineTo(-w/2, h/2); ctx.lineTo(-w/2, h/2 - cs);
                 ctx.stroke();
             }
 
-            // Labels — on-canvas labels are now quieter: small, no shadow,
-            // consistent position (inside top-left when there's room).
             const isExcl = item.isExclusion;
             const dbV = isExcl ? null : calculateTotalDb(item.x + item.w / 2, item.y + item.h / 2);
             const labelStr = item.label;
             const dbStr = dbV != null ? `${Math.round(dbV)} dB` : 'exclusion';
 
             if (h > 32 && w > 60) {
-                // Inside
                 ctx.fillStyle = canvasColors.text1;
                 ctx.font = '500 11px Inter';
                 ctx.fillText(labelStr, -w/2 + 6, -h/2 + 14);
@@ -1553,7 +1493,6 @@
                 ctx.fillStyle = isExcl ? canvasColors.text3 : (dbV > 85 ? canvasColors.accent : canvasColors.text2);
                 ctx.fillText(dbStr, -w/2 + 6, h/2 - 6);
             } else {
-                // Outside, centred above
                 ctx.textAlign = 'center';
                 ctx.fillStyle = canvasColors.text1;
                 ctx.font = '500 11px Inter';
@@ -1572,8 +1511,6 @@
         ctx.clearRect(0, 0, width, height);
         renderBackground();
 
-        // Veil — semi-transparent wash between satellite tiles and heatmap.
-        // mapOpacity slider is repurposed: 0 = full satellite, 100 = satellite hidden.
         if (state.ui.mapMode) {
             const veil = state.doc.mapOpacity / 100;
             if (veil > 0) {
@@ -1588,14 +1525,12 @@
         if (dirty.heatmap) renderHeatmap();
         ctx.drawImage(offscreenHeatmap, 0, 0);
 
-        // World-space items — drawn inside the viewport transform
         ctx.save();
         ctx.translate(state.ui.pan.x, state.ui.pan.y);
         ctx.scale(state.ui.zoom, state.ui.zoom);
         for (const item of state.doc.items) renderItem(item);
         ctx.restore();
 
-        // Screen-space overlays — always fixed to the canvas edges
         renderSchedule();
         renderLegend();
         renderCalibrationBar();
@@ -1604,9 +1539,6 @@
         dirty.canvas = false;
     }
 
-    // Wind direction compass — bottom-centre, screen space.
-    // Arrow uses compass convention (0=N, 90=E) matching the acoustic model.
-    // Dimmed when speed is zero so it doesn't distract during calm conditions.
     function renderWindIndicator() {
         const { width, height } = state.ui;
         const speed = state.doc.windSpeed;
@@ -1621,7 +1553,6 @@
         const active = speed > 0;
         ctx.globalAlpha = active ? 1.0 : 0.3;
 
-        // Background disc
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.fillStyle = canvasColors.surface;
@@ -1630,27 +1561,23 @@
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // "N" cardinal at top
         ctx.fillStyle = canvasColors.text3;
         ctx.font = '600 8px Inter';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('N', 0, -(r - 7));
 
-        // Wind arrow — compass convention, offset −90° for canvas coords
         const rad = (dir - 90) * Math.PI / 180;
         const tip = r - 5;
         ctx.strokeStyle = active ? canvasColors.accent : canvasColors.text3;
         ctx.fillStyle   = active ? canvasColors.accent : canvasColors.text3;
         ctx.lineWidth = 1.5;
 
-        // Stem
         ctx.beginPath();
         ctx.moveTo(-Math.cos(rad) * 5, -Math.sin(rad) * 5);
         ctx.lineTo( Math.cos(rad) * (tip - 7),  Math.sin(rad) * (tip - 7));
         ctx.stroke();
 
-        // Filled arrowhead
         const hLen = 7, hAng = Math.PI / 5;
         ctx.beginPath();
         ctx.moveTo( Math.cos(rad) * tip, Math.sin(rad) * tip);
@@ -1661,7 +1588,6 @@
 
         ctx.globalAlpha = 1.0;
 
-        // Speed label below when active
         if (active) {
             ctx.fillStyle = canvasColors.text2;
             ctx.font = '500 9px "JetBrains Mono"';
@@ -1785,7 +1711,6 @@
             return;
         }
 
-        // Inspector header — shows item type + id
         const header = el('div', 'flex items-center justify-between mb-3 pb-2 hairline-b');
         const typeLabel = el('div', 'mono');
         typeLabel.style.fontSize = '11px';
@@ -1805,7 +1730,6 @@
             grid.appendChild(numberField(item, 'bassBias', 'Bass bias'));
             container.appendChild(grid);
 
-            // Warn if this speaker sits inside a canopy zone
             const canopy = getCanopyForSource(item);
             if (canopy) {
                 const note = el('div');
@@ -1816,11 +1740,9 @@
         } else {
             container.appendChild(textField(item, 'label', 'Label'));
 
-            // Custom zone controls — color picker + exclusion toggle
             if (item.type === 'custom') {
                 const row = el('div', 'grid grid-cols-2 gap-2');
 
-                // Color picker
                 const colorWrap = el('div');
                 colorWrap.appendChild(el('label', 'field-label', { text: 'Colour' }));
                 const colorInp = document.createElement('input');
@@ -1834,7 +1756,6 @@
                 colorWrap.appendChild(colorInp);
                 row.appendChild(colorWrap);
 
-                // Exclusion toggle
                 const excWrap = el('div');
                 excWrap.appendChild(el('label', 'field-label', { text: 'Exclusion zone' }));
                 const excLabel = el('label', 'flex items-center gap-2');
@@ -1867,13 +1788,11 @@
             container.appendChild(grid);
             container.appendChild(materialField(item));
 
-            // Per-item acoustic sliders — override the material preset defaults
             const absReflGrid = el('div', 'flex flex-col gap-3');
             absReflGrid.appendChild(sliderField(item, 'absorption', 'Absorption (0–100)', 0, 100));
             absReflGrid.appendChild(sliderField(item, 'reflection',  'Reflection (0–100)', 0, 100));
             container.appendChild(absReflGrid);
 
-            // Explain canopy behaviour when the zone uses a pass-through material
             if (MATERIAL_PRESETS[item.material]?.type === 'canopy') {
                 const note = el('div');
                 note.style.cssText = 'font-size:11px;line-height:1.5;padding:8px 10px;border-radius:3px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2)';
@@ -1942,9 +1861,6 @@
     // 9. INPUT HANDLING
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Viewport coordinate transforms.
-    // World coords = item/acoustic space (unchanged by pan/zoom).
-    // Screen coords = canvas pixel position.
     function screenToWorld(sx, sy) {
         return { x: (sx - state.ui.pan.x) / state.ui.zoom,
                  y: (sy - state.ui.pan.y) / state.ui.zoom };
@@ -1962,18 +1878,12 @@
         if (d) d.textContent = Math.round(state.ui.zoom * 100) + '%';
     }
 
-    // Returns the first canopy-type zone that contains a source, or null.
     function getCanopyForSource(source) {
         return state.doc.items.find(item =>
             item.type !== 'source' &&
             MATERIAL_PRESETS[item.material]?.type === 'canopy' &&
             isPointInItem(source.x, source.y, item)
         ) ?? null;
-    }
-
-    function getMousePos(e) {
-        const s = getScreenPos(e);
-        return screenToWorld(s.x, s.y);
     }
 
     function findItemAt(pos) {
@@ -1988,11 +1898,9 @@
         const pos = screenToWorld(screenPos.x, screenPos.y);
         const mode = state.ui.mode;
 
-        // Middle mouse button OR space+left-drag = pan
         if (e.button === 1 || (e.button === 0 && state.ui.spaceDown)) {
             e.preventDefault();
             state.ui.isPanning = true;
-            // In map mode, panning is incremental (we ask Leaflet to panBy on each move)
             state.ui.panAnchor = state.ui.mapMode
                 ? { sx: screenPos.x, sy: screenPos.y }
                 : { sx: screenPos.x, sy: screenPos.y, ox: state.ui.pan.x, oy: state.ui.pan.y };
@@ -2047,7 +1955,6 @@
         if (state.ui.isPanning) {
             const a = state.ui.panAnchor;
             if (state.ui.mapMode && leafletMap) {
-                // Incremental Leaflet pan; Leaflet 'move' event will sync canvas
                 const dx = screenPos.x - a.sx;
                 const dy = screenPos.y - a.sy;
                 leafletMap.panBy([-dx, -dy], { animate: false });
@@ -2118,7 +2025,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `acoustic-planner-${Date.now()}.json`;
+        a.download = `spl-architect-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
         toast('Project saved');
@@ -2152,7 +2059,6 @@
                 toast('Project loaded');
             } catch (err) {
                 toast('Failed to load project: invalid file', true);
-                console.error('Load failed:', err);
             }
         };
         reader.onerror = () => toast('Failed to read file', true);
@@ -2160,53 +2066,25 @@
         e.target.value = '';
     }
 
-    // Fetch and draw Esri satellite tiles onto the export canvas.
-    // Tiles are requested with crossOrigin='anonymous' — Esri's public imagery
-    // service sends Access-Control-Allow-Origin:* so canvas capture is permitted.
+    // Corrected tile mapping function using strictly Leaflet's container projection
     async function drawSatelliteTilesExport(tCtx, eW, mapH, hH, factor) {
-        const scale              = state.doc.scale;
-        const metersPerWorldPx   = 1 / scale;
-        const originProj         = L.CRS.EPSG3857.project(geoOrigin);
-        const { zoom, pan }      = state.ui;
+        if (!leafletMap || !geoOrigin) return;
+        const { zoom, width, height } = state.ui;
 
-        function worldToLL(wx, wy) {
-            const pt = L.point(
-                originProj.x + wx * metersPerWorldPx,
-                originProj.y - wy * metersPerWorldPx
-            );
-            return L.CRS.EPSG3857.unproject(pt);
-        }
+        // 1. Get the exact LatLng bounds that fill the current screen
+        const tlLatLng = leafletMap.containerPointToLatLng(L.point(0, 0));
+        const brLatLng = leafletMap.containerPointToLatLng(L.point(width, height));
 
-        function llToWorld(ll) {
-            const pt = L.CRS.EPSG3857.project(ll);
-            return {
-                x: (pt.x - originProj.x) / metersPerWorldPx,
-                y: -(pt.y - originProj.y) / metersPerWorldPx
-            };
-        }
-
-        // Use the actual screen corners so the export covers exactly what's visible.
-        // screenToWorld accounts for the current pan/zoom correctly.
-        const { width, height } = state.ui;
-        const tlWorld  = screenToWorld(0, 0);
-        const brWorld  = screenToWorld(width, height);
-        const tlLatLng = worldToLL(tlWorld.x, tlWorld.y);
-        const brLatLng = worldToLL(brWorld.x, brWorld.y);
-
-        // Choose tile zoom that matches export resolution
-        const lat0      = geoOrigin.lat;
-        const exportMPP = metersPerWorldPx / (zoom * factor);   // m per export px
+        // 2. Select appropriate tile zoom based on the desired export resolution
+        const exportMPP = (1 / state.doc.scale) / (zoom * factor); 
         const idealZoom = Math.log2(
-            156543.03392 * Math.cos(lat0 * Math.PI / 180) / exportMPP
+            156543.03392 * Math.cos(geoOrigin.lat * Math.PI / 180) / exportMPP
         );
-        const tileZoom  = Math.min(19, Math.max(14, Math.round(idealZoom)));
+        const tileZoom = Math.min(19, Math.max(14, Math.round(idealZoom)));
 
-        // Tile size in export pixels — Mercator width × zoom (screen pixels) × factor (→ export)
-        const mercatorTileWidth = (2 * Math.PI * 6378137) / Math.pow(2, tileZoom);
-        const tileExportSz      = mercatorTileWidth / metersPerWorldPx * zoom * factor;
-
+        // 3. Tile coordinate geometry helpers
         function llToTileXY(ll, z) {
-            const n      = Math.pow(2, z);
+            const n = Math.pow(2, z);
             const latRad = ll.lat * Math.PI / 180;
             return {
                 x: Math.floor((ll.lng + 180) / 360 * n),
@@ -2215,7 +2093,7 @@
         }
 
         function tileTopLeft(tx, ty, z) {
-            const n   = Math.pow(2, z);
+            const n = Math.pow(2, z);
             const lng = tx / n * 360 - 180;
             const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
             return L.latLng(lat, lng);
@@ -2224,31 +2102,44 @@
         const tlTile = llToTileXY(tlLatLng, tileZoom);
         const brTile = llToTileXY(brLatLng, tileZoom);
 
+        // 4. Request tiles within screen bounds
         const promises = [];
         for (let tx = tlTile.x; tx <= brTile.x; tx++) {
             for (let ty = tlTile.y; ty <= brTile.y; ty++) {
                 const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tileZoom}/${ty}/${tx}`;
                 promises.push(new Promise(resolve => {
-                    const img       = new Image();
+                    const img = new Image();
                     img.crossOrigin = 'anonymous';
-                    img.onload      = () => resolve({ img, tx, ty });
-                    img.onerror     = () => resolve(null);
-                    img.src         = url;
+                    img.onload = () => resolve({ img, tx, ty });
+                    img.onerror = () => resolve(null);
+                    img.src = url;
                 }));
             }
         }
 
         const tiles = await Promise.all(promises);
 
+        // 5. Project each loaded tile securely onto the export canvas
         for (const tile of tiles) {
             if (!tile) continue;
             const { img, tx, ty } = tile;
-            const tileLL    = tileTopLeft(tx, ty, tileZoom);
-            const tileWorld = llToWorld(tileLL);
-            // World → screen → export (same transform used for all items)
-            const ex        = (tileWorld.x * zoom + pan.x) * factor;
-            const ey        = hH + (tileWorld.y * zoom + pan.y) * factor;
-            tCtx.drawImage(img, ex, ey, tileExportSz, tileExportSz);
+            
+            // Map the exact corners of this tile
+            const tileTL_LatLng = tileTopLeft(tx, ty, tileZoom);
+            const tileBR_LatLng = tileTopLeft(tx + 1, ty + 1, tileZoom);
+            
+            // Query leaflet for where those corners currently sit on the live screen
+            const tlScreen = leafletMap.latLngToContainerPoint(tileTL_LatLng);
+            const brScreen = leafletMap.latLngToContainerPoint(tileBR_LatLng);
+            
+            // Multiply the screen bounding box by our export up-scale factor
+            const ex = tlScreen.x * factor;
+            const ey = hH + tlScreen.y * factor;
+            const eW_tile = (brScreen.x - tlScreen.x) * factor;
+            const eH_tile = (brScreen.y - tlScreen.y) * factor;
+            
+            // Overdraw the tile by half a pixel to prevent seamless grid lines
+            tCtx.drawImage(img, ex, ey, eW_tile + 0.5, eH_tile + 0.5);
         }
     }
 
@@ -2273,7 +2164,6 @@
         tC.width   = eW; tC.height = totalH;
         const tCtx = tC.getContext('2d');
 
-        // Pull live CSS colour values
         const bg   = cssVar('--bg');
         const surf = cssVar('--surface');
         const bord = cssVar('--border');
@@ -2287,23 +2177,20 @@
         tCtx.fillStyle = surf;
         tCtx.fillRect(0, 0, eW, hH);
         tCtx.fillStyle = acc;
-        tCtx.fillRect(0, hH - 2, eW, 2);  // accent underline
+        tCtx.fillRect(0, hH - 2, eW, 2);
 
         tCtx.textBaseline = 'middle';
 
-        // Event name (left, large)
         tCtx.fillStyle = t1;
         tCtx.font = '600 48px Inter, sans-serif';
-        tCtx.fillText(state.doc.eventName || 'Acoustic Site Plan', pad, hH * 0.36);
+        tCtx.fillText(state.doc.eventName || 'SPL Architect Plan', pad, hH * 0.36);
 
-        // "Acoustic Site Plan" sub-label (only when name is set)
         if (state.doc.eventName) {
             tCtx.fillStyle = t2;
             tCtx.font = '400 26px Inter, sans-serif';
-            tCtx.fillText('Acoustic Site Plan', pad, hH * 0.70);
+            tCtx.fillText('SPL Architect Plan', pad, hH * 0.70);
         }
 
-        // Date · Location (right)
         const meta = [state.doc.eventDate, state.doc.eventLocation].filter(Boolean).join('  ·  ');
         tCtx.textAlign = 'right';
         if (meta) {
@@ -2311,7 +2198,6 @@
             tCtx.font = '500 26px Inter, sans-serif';
             tCtx.fillText(meta, eW - pad, hH * 0.36);
         }
-        // Generated timestamp
         tCtx.fillStyle = t3;
         tCtx.font = '400 20px Inter, sans-serif';
         tCtx.fillText(
@@ -2322,6 +2208,11 @@
         tCtx.textBaseline = 'alphabetic';
 
         // ── MAP AREA ─────────────────────────────────────────────────────
+        tCtx.save();
+        tCtx.beginPath();
+        tCtx.rect(0, hH, eW, mapH);
+        tCtx.clip();
+
         tCtx.fillStyle = bg;
         tCtx.fillRect(0, hH, eW, mapH);
 
@@ -2329,7 +2220,6 @@
         if (state.ui.mapMode && leafletMap && geoOrigin) {
             toast('Fetching satellite tiles…');
             await drawSatelliteTilesExport(tCtx, eW, mapH, hH, factor);
-            // Veil over satellite
             const veil = state.doc.mapOpacity / 100;
             if (veil > 0) {
                 const isDark = !document.documentElement.classList.contains('light');
@@ -2337,7 +2227,6 @@
                 tCtx.fillRect(0, hH, eW, mapH);
             }
         } else if (state.ui.backgroundImage) {
-            // Background map image
             const img = state.ui.backgroundImage;
             const r   = img.width / img.height;
             let dw = eW, dh = eW / r;
@@ -2347,8 +2236,6 @@
             tCtx.globalAlpha = 1.0;
         }
 
-        // Heatmap — convert export pixels to world coords via the current viewport
-        // (screenToWorld handles pan/zoom correctly in both satellite and normal mode).
         const scheme = INTENSITY_SCHEMES[state.doc.scheme];
         const floor  = state.doc.noiseFloor;
         for (let x = 0; x < eW; x += EXPORT_HEATMAP_STEP) {
@@ -2362,7 +2249,6 @@
             }
         }
 
-        // Items — positions derived from world→screen→export, matching the live canvas view.
         const vZoom = state.ui.zoom;
         const vPan  = state.ui.pan;
         function wToEX(wx) { return (wx * vZoom + vPan.x) * factor; }
@@ -2379,16 +2265,13 @@
             tCtx.rotate(item.angle * Math.PI / 180);
             if (item.type === 'source') {
                 const srcNum = sources.indexOf(item) + 1;
-                // Slightly larger dot than live canvas for print legibility
                 tCtx.beginPath();
                 tCtx.arc(0, 0, 20, 0, Math.PI * 2);
                 tCtx.fillStyle = acc;
                 tCtx.fill();
-                // Direction tick
                 tCtx.beginPath();
                 tCtx.moveTo(14, 0); tCtx.lineTo(30, 0);
                 tCtx.strokeStyle = bg; tCtx.lineWidth = 5; tCtx.stroke();
-                // Source number — counter-rotated so it's always upright
                 tCtx.save();
                 tCtx.rotate(-item.angle * Math.PI / 180);
                 tCtx.fillStyle = bg;
@@ -2397,7 +2280,6 @@
                 tCtx.textBaseline = 'middle';
                 tCtx.fillText(srcNum, 0, 0);
 
-                // Speaker label above the dot — only when set
                 if (item.label) {
                     tCtx.font = '600 20px Inter, sans-serif';
                     const tw = tCtx.measureText(item.label).width;
@@ -2416,7 +2298,6 @@
                 const isCanopy = MATERIAL_PRESETS[item.material]?.type === 'canopy';
                 const zoneColor = item.customColor ?? cfg.color;
 
-                // Fill — checkerboard for exclusion zones, tint otherwise
                 if (item.isExclusion) {
                     const pc = document.createElement('canvas');
                     const cs = 14;
@@ -2432,14 +2313,12 @@
                 }
                 tCtx.fillRect(-w/2, -h/2, w, h);
 
-                // Border — dashed for exclusion zones
                 tCtx.strokeStyle = zoneColor;
                 tCtx.lineWidth = item.isExclusion ? 5 : 4;
                 if (item.isExclusion) tCtx.setLineDash([14, 6]);
                 tCtx.strokeRect(-w/2, -h/2, w, h);
                 tCtx.setLineDash([]);
 
-                // Numbered badge
                 const zoneNum = zones.indexOf(item) + 1;
                 const badgeR  = 18;
                 const bx = w > badgeR * 4 ? -w/2 + badgeR + 10 : 0;
@@ -2460,7 +2339,6 @@
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
 
-                // SPL reading — skip exclusion and canopy zones
                 if (!isCanopy && !item.isExclusion && item.h > 60) {
                     const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
                     tCtx.shadowColor = 'rgba(0,0,0,0.80)';
@@ -2475,11 +2353,12 @@
             tCtx.restore();
         }
 
+        tCtx.restore(); // End map area clipping
+
         // ── LEGEND (top-left of map area) ───────────────────────────────
         {
             const lPad = 44, lX = lPad, lY = hH + lPad;
             const sW = 18, sH = 300;
-            // Card background
             tCtx.fillStyle = surf;
             tCtx.globalAlpha = 0.88;
             tCtx.fillRect(lX - 10, lY - 8, sW + 92, sH + 42);
@@ -2487,13 +2366,11 @@
             tCtx.strokeStyle = bord; tCtx.lineWidth = 1;
             tCtx.strokeRect(lX - 10 + 0.5, lY - 8 + 0.5, sW + 92 - 1, sH + 42 - 1);
 
-            // "SPL (dB)" label
             tCtx.fillStyle = t3;
             tCtx.font = '500 20px Inter, sans-serif';
             tCtx.textBaseline = 'alphabetic';
             tCtx.fillText('SPL (dB)', lX, lY + 14);
 
-            // Colour strip
             for (let i = 0; i < sH; i += 3) {
                 const db = 30 + ((sH - i) / sH) * 100;
                 tCtx.fillStyle = scheme(db, 0.9);
@@ -2502,7 +2379,6 @@
             tCtx.strokeStyle = bord; tCtx.lineWidth = 1;
             tCtx.strokeRect(lX + 0.5, lY + 22 + 0.5, sW - 1, sH - 1);
 
-            // Tick labels every 20 dB
             tCtx.fillStyle = t2;
             tCtx.font = '400 18px "JetBrains Mono", monospace';
             tCtx.textBaseline = 'middle';
@@ -2532,7 +2408,6 @@
             tCtx.strokeStyle = t1; tCtx.lineWidth = 1.5;
             tCtx.strokeRect(bX + 0.5, bY + 0.5, barW - 1, barH - 1);
 
-            // End caps
             tCtx.beginPath();
             tCtx.moveTo(bX + 0.5,        bY - 4); tCtx.lineTo(bX + 0.5,        bY + barH + 4);
             tCtx.moveTo(bX + barW - 0.5, bY - 4); tCtx.lineTo(bX + barW - 0.5, bY + barH + 4);
@@ -2549,22 +2424,19 @@
         // ── FOOTER: SPEAKERS (left) + ZONES (right) ──────────────────────
         if (hasTable) {
             const tY   = hH + mapH;
-            const divX = 1150;  // x position of vertical divider
+            const divX = 1150; 
 
-            // Panel background + accent top border
             tCtx.fillStyle = surf;
             tCtx.fillRect(0, tY, eW, tH);
             tCtx.fillStyle = acc;
             tCtx.fillRect(0, tY, eW, 3);
 
-            // Vertical divider
             tCtx.fillStyle = bord;
             tCtx.fillRect(divX, tY + 14, 1, tH - 28);
 
             const thY = tY + tHeadH / 2;
 
             // ── SPEAKERS (left panel) ─────────────────────────────────────
-            // Column x positions — values right-aligned for clean numeric column
             const cSLabel  = pad;
             const cSSpl    = 440;
             const cSBeam   = 650;
@@ -2592,7 +2464,6 @@
                 }
                 tCtx.textBaseline = 'middle';
 
-                // Numbered badge
                 tCtx.beginPath();
                 tCtx.arc(pad + 14, ry, 13, 0, Math.PI * 2);
                 tCtx.fillStyle = acc;
@@ -2654,7 +2525,6 @@
                     tCtx.fillRect(divX + 1, tY + tHeadH + i * tRowH, eW - divX - 1, tRowH);
                 }
 
-                // Numbered badge using zone color
                 tCtx.beginPath();
                 tCtx.arc(cDot + 14, ry, 13, 0, Math.PI * 2);
                 tCtx.fillStyle = zoneColor;
@@ -2700,7 +2570,7 @@
             tCtx.textBaseline = 'alphabetic';
         }
 
-        const safeName = (state.doc.eventName || 'acoustic-site-plan')
+        const safeName = (state.doc.eventName || 'spl-architect-plan')
             .replace(/[^a-z0-9]+/gi, '-').toLowerCase();
         const a = document.createElement('a');
         a.download = `${safeName}.png`;
@@ -2754,8 +2624,6 @@
         });
     }
 
-    // Scale binding rescales all existing item positions + dimensions so
-    // placements remain correct after a scale change. Pushes history first.
     function bindScaleInput() {
         const num    = document.getElementById('scaleInput');
         const slider = document.getElementById('scaleSlider');
@@ -2771,7 +2639,6 @@
                 item.y *= ratio;
                 if (item.w != null) item.w *= ratio;
                 if (item.h != null) item.h *= ratio;
-                // vHeight is in metres — not pixel-based, no rescaling needed
             }
             state.doc.scale = newScale;
             if (num.value    != newScale) num.value    = newScale;
@@ -2803,7 +2670,6 @@
     // 12. THEME
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Sun/moon icon SVG paths — swapped on toggle.
     const THEME_ICONS = {
         dark:  `<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>`,
         light: `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`
@@ -2818,7 +2684,6 @@
     }
 
     function initialTheme() {
-        // System preference, but remember user choice if they've toggled.
         const stored = localStorage.getItem('asp-theme');
         if (stored === 'light' || stored === 'dark') return stored;
         return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -2849,15 +2714,13 @@
     // ═══════════════════════════════════════════════════════════════════════
 
     let leafletMap  = null;
-    let geoOrigin   = null;   // {lat,lng} of canvas world-space (0,0)
+    let geoOrigin   = null;   
 
-    // Leaflet meters-per-pixel at current zoom + center latitude
     function leafletMPP() {
         const c = leafletMap.getCenter();
         return 156543.03392 * Math.cos(c.lat * Math.PI / 180) / Math.pow(2, leafletMap.getZoom());
     }
 
-    // Drive canvas pan/zoom from Leaflet's current view
     function syncCanvasFromLeaflet() {
         if (!leafletMap || !geoOrigin) return;
         const mpp = leafletMPP();
@@ -2898,11 +2761,9 @@
 
             if (!leafletMap) {
                 initLeafletMap();
-                // Place canvas world origin at screen centre
                 state.ui.pan = { x: state.ui.width / 2, y: state.ui.height / 2 };
             }
             leafletMap.invalidateSize();
-            // Derive geoOrigin from where canvas world (0,0) currently sits on screen
             geoOrigin = leafletMap.containerPointToLatLng(
                 L.point(state.ui.pan.x, state.ui.pan.y)
             );
@@ -2929,8 +2790,6 @@
                 const lat = parseFloat(results[0].lat);
                 const lon = parseFloat(results[0].lon);
                 leafletMap.setView([lat, lon], 17);
-                // Anchor world (0,0) to the searched location so items placed
-                // here have small, sensible world coordinates.
                 geoOrigin = L.latLng(lat, lon);
                 syncCanvasFromLeaflet();
                 toast(results[0].display_name.split(',').slice(0, 2).join(', '));
@@ -2945,9 +2804,7 @@
     function syncScaleFromMap() {
         if (!leafletMap) return;
         const mpp = leafletMPP();
-        // Set scale so 1 world pixel = 1 m at this zoom, canvasZoom ≈ 1
         const newScale = Math.max(1, Math.round(1 / mpp));
-        // Update scale without rescaling items (they're geo-referenced)
         state.doc.scale = newScale;
         document.getElementById('scaleInput').value  = newScale;
         document.getElementById('scaleSlider').value = newScale;
@@ -2962,7 +2819,6 @@
     function init() {
         applyTheme(initialTheme());
 
-        // React to system theme changes if user hasn't manually chosen.
         window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
             if (!localStorage.getItem('asp-theme')) {
                 applyTheme(e.matches ? 'light' : 'dark');
@@ -2976,10 +2832,8 @@
         canvas.addEventListener('mousedown', handleMouseDown);
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseup', handleMouseUp);
-        // Suppress context menu on middle-click
         canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-        // Scroll to zoom, centred on cursor
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (state.ui.mapMode && leafletMap) {
@@ -2997,7 +2851,6 @@
             markDirty('canvas', 'heatmap');
         }, { passive: false });
 
-        // Two-finger pan + pinch-to-zoom (tablets / trackpads)
         let _lastTouches = [];
         canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
@@ -3014,12 +2867,10 @@
             const t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             const t1 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
             const l0 = _lastTouches[0], l1 = _lastTouches[1];
-            // Pan from midpoint delta
             const midX = (t0.x + t1.x) / 2, midY = (t0.y + t1.y) / 2;
             const lmidX = (l0.x + l1.x) / 2, lmidY = (l0.y + l1.y) / 2;
             state.ui.pan.x += midX - lmidX;
             state.ui.pan.y += midY - lmidY;
-            // Pinch zoom centred on midpoint
             const dist  = Math.hypot(t0.x - t1.x, t0.y - t1.y);
             const ldist = Math.hypot(l0.x - l1.x, l0.y - l1.y);
             if (ldist > 0) {
@@ -3058,21 +2909,18 @@
         document.getElementById('themeBtn').addEventListener('click', toggleTheme);
         document.getElementById('satelliteBtn').addEventListener('click', toggleSatellite);
 
-        // Satellite section
         document.getElementById('locationSearchBtn').addEventListener('click', searchLocation);
         document.getElementById('locationSearch').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') searchLocation();
         });
         document.getElementById('scaleSyncBtn').addEventListener('click', syncScaleFromMap);
 
-        // Event detail fields — live-update state.doc (no dirty flag needed, export-only)
         ['eventName', 'eventDate', 'eventLocation'].forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 state.doc[id] = e.target.value;
             });
         });
 
-        // Help modal
         const helpModal = document.getElementById('helpModal');
         document.getElementById('helpBtn').addEventListener('click', () => {
             helpModal.classList.toggle('open');
@@ -3105,7 +2953,6 @@
                 state.ui.spaceDown = true;
                 if (!state.ui.isPanning) canvas.style.cursor = 'grab';
             } else if (e.key === '0') {
-                // Reset view to 1:1 centred
                 state.ui.pan = { x: 0, y: 0 };
                 state.ui.zoom = 1.0;
                 updateZoomDisplay();
@@ -3139,31 +2986,30 @@
 
             <div class="help-sec">
                 <div class="help-h2">Quick start</div>
-                <p class="help-p"><strong>1. Set scale</strong> — use the px/m slider to match your site map. 10 px/m suits most single-stage sites; use 5 px/m for larger festivals. Upload a map image with the Map button.</p>
+                <p class="help-p"><strong>1. Set scale &amp; map</strong> — use the px/m slider to match your site map. Upload a map image, or click <strong>Satellite</strong> to search for a location and automatically sync the scale to the map zoom.</p>
                 <p class="help-p"><strong>2. Place speakers</strong> — select the Speaker tool and click the canvas. Set SPL, beam angle, bass bias, and mount height in the inspector.</p>
                 <p class="help-p"><strong>3. Add zones</strong> — drag zone shapes to define areas (Stage, Camping, Dancefloor…). The schedule panel shows estimated SPL at each zone centre.</p>
                 <p class="help-p"><strong>4. Add barriers</strong> — Heras panels and hay bales block and absorb sound. Place between sources and sensitive areas; angle for best effect.</p>
                 <p class="help-p"><strong>5. Check frequencies</strong> — switch to Low (125 Hz) to see bass propagation. This is usually the noise-compliance concern for camping and residential areas.</p>
-                <p class="help-p"><strong>6. Export</strong> — fill in the event details in the sidebar, then export a PNG containing the heatmap and the full SPL table.</p>
+                <p class="help-p"><strong>6. Export</strong> — fill in the event details in the sidebar, then export a clean PNG containing the heatmap, a trimmed satellite backdrop, and the full SPL table.</p>
             </div>
 
             <div class="help-sec">
                 <div class="help-h2">Tools</div>
                 <p class="help-p"><strong>Speaker</strong> — click to place. Peak SPL sets the source level; dispersion angle narrows or widens the coverage cone; bass bias shifts spectral energy towards low or high frequencies; mount height affects diffraction over barriers.</p>
-                <p class="help-p"><strong>Hay Bales</strong> — absorptive barriers (~1.5 m). Effective at mid/high frequencies, limited at bass. Works best angled as a baffle rather than a straight wall — use the Rotation slider.</p>
-                <p class="help-p"><strong>Heras Panel</strong> — covered acoustic fencing (3.5 m). Good broadband attenuation. Adjust the Reflection slider to model bare vs. acoustic-blanket-covered panels.</p>
-                <p class="help-p"><strong>Ruler</strong> — click and drag to measure any distance on the canvas. Reading shown in metres.</p>
+                <p class="help-p"><strong>Hay Bales &amp; Heras</strong> — absorptive barriers. Effective at mid/high frequencies, limited at bass. Works best angled as a baffle rather than a straight wall — use the Rotation slider to adjust.</p>
                 <p class="help-p"><strong>Zone palette</strong> — areas for the SPL schedule. Canopy zones (stretch tents) are acoustically transparent and are excluded from the SPL table. Speakers under a canopy show a dashed indicator ring.</p>
+                <p class="help-p"><strong>Custom Zones</strong> — use the Custom tool to draw any element. Toggle 'Exclusion zone' in the inspector to block it out with a checkerboard pattern, or use the color picker for visual organisation.</p>
+                <p class="help-p"><strong>Ruler</strong> — click and drag to measure any distance on the canvas. Reading shown in metres.</p>
             </div>
 
             <div class="help-sec">
-                <div class="help-h2">Acoustic model</div>
+                <div class="help-h2">Acoustic model &amp; display</div>
                 <p class="help-p"><strong>Scale</strong> — set this before placing anything. All distance and SPL calculations derive from it; changing it later does not rescale existing items.</p>
+                <p class="help-p"><strong>Satellite &amp; Veil</strong> — when using the satellite view, use the 'Map veil' slider to dim the background map and make the acoustic heatmap easier to read.</p>
                 <p class="help-p"><strong>Ground type</strong> — grass attenuates mid/high frequencies more than hard standing (ground absorbs the reflected wave). Concrete adds a ~3 dB boost from constructive ground reflection.</p>
                 <p class="help-p"><strong>Barriers</strong> — height dominates. A 4 m barrier gives roughly 9 dB insertion loss at 125 Hz and 23 dB at 4 kHz (Maekawa formula). Use the Reflection slider to model barrier solidity; Absorption to model transmission loss through thin or porous surfaces.</p>
-                <p class="help-p"><strong>Canopy zones</strong> — stretch tents and open-sided structures pass sound through and cast no acoustic shadow. Speakers placed under them are unaffected and are shown with a dashed ring.</p>
                 <p class="help-p"><strong>Wind</strong> — boosts SPL downwind and attenuates it upwind, scaled by distance. Set speed and bearing to model prevailing conditions during the event.</p>
-                <p class="help-p"><strong>Bass bias</strong> on speakers shifts spectral energy between the 125 Hz, 1 kHz, and 4 kHz bands. The broadband view sums all three; individual band views show frequency-specific propagation.</p>
             </div>
 
             <div class="help-sec">
