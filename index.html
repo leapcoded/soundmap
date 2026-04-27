@@ -614,7 +614,7 @@
             <!-- DOM UI Overlay -->
             <div id="uiOverlay" style="position:absolute;inset:0;z-index:5;pointer-events:none;">
                 <div id="domLegend" style="position:absolute;top:16px;left:16px;background:var(--surface);border:1px solid var(--border);padding:12px;border-radius:3px;opacity:0.95;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
-                <div id="domSchedule" class="scroll" style="position:absolute;top:16px;right:16px;width:320px;max-height:calc(100% - 80px);border-radius:3px;opacity:0.95;pointer-events:auto;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+                <div id="domSchedule" class="scroll" style="position:absolute;top:16px;right:16px;width:320px;max-height:calc(100% - 80px);background:var(--surface);border:1px solid var(--border);border-radius:3px;opacity:0.95;pointer-events:auto;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
                 <div id="domCalibration" style="position:absolute;bottom:50px;right:16px;display:flex;flex-direction:column;align-items:center;opacity:0.95;"></div>
             </div>
 
@@ -1216,7 +1216,7 @@
             </div>`;
             allItems.forEach((o) => {
                 const sel = o.id === state.ui.selectedId;
-                const bg = sel ? 'background:var(--accent-faint);' : 'background:var(--surface);';
+                const bg = sel ? 'background:var(--surface-2);' : 'background:transparent;';
                 const color = sel ? 'color:var(--accent);font-weight:600;' : 'color:var(--text-1);font-weight:500;';
 
                 let splText = '—';
@@ -1244,13 +1244,14 @@
             });
             schedEl.innerHTML = html;
             schedEl.querySelectorAll('.sched-row').forEach(row => {
+                const isSel = parseFloat(row.dataset.id) === state.ui.selectedId;
                 row.addEventListener('click', () => {
                     state.ui.selectedId = parseFloat(row.dataset.id);
                     setMode('select');
                     markDirty('canvas', 'inspector', 'ui');
                 });
-                row.addEventListener('mouseenter', () => { if (row.style.background !== 'var(--accent-faint)') row.style.background = 'var(--surface-2)'; });
-                row.addEventListener('mouseleave', () => { if (row.style.background !== 'var(--accent-faint)') row.style.background = 'var(--surface)'; });
+                row.addEventListener('mouseenter', () => { if (!isSel) row.style.background = 'var(--surface-2)'; });
+                row.addEventListener('mouseleave', () => { if (!isSel) row.style.background = 'transparent'; });
             });
         }
 
@@ -2417,10 +2418,13 @@
                 if (item.label) {
                     tCtx.font = '600 20px Inter, sans-serif';
                     const tw = tCtx.measureText(item.label).width;
-                    const ph = 24, pPad = 8, labelY = -34;
-                    tCtx.fillStyle = 'rgba(0,0,0,0.72)';
-                    tCtx.fillRect(-tw / 2 - pPad, labelY - ph + 4, tw + pPad * 2, ph);
-                    tCtx.fillStyle = acc;
+                    const ph = 30, pPad = 12, labelY = -36;
+                    tCtx.fillStyle = surf;
+                    tCtx.fillRect(-tw / 2 - pPad, labelY - ph + 8, tw + pPad * 2, ph);
+                    tCtx.lineWidth = 1;
+                    tCtx.strokeStyle = bord;
+                    tCtx.strokeRect(-tw / 2 - pPad, labelY - ph + 8, tw + pPad * 2, ph);
+                    tCtx.fillStyle = t1;
                     tCtx.fillText(item.label, 0, labelY);
                 }
 
@@ -2473,7 +2477,7 @@
                 tCtx.textAlign = 'start';
                 tCtx.textBaseline = 'alphabetic';
 
-                if (!isCanopy && !item.isExclusion && item.h > 60) {
+                if (!isCanopy && !item.isExclusion && h > 40 && w > 80) {
                     const dbV = calculateTotalDb(item.x + item.w/2, item.y + item.h/2);
                     tCtx.shadowColor = 'rgba(0,0,0,0.80)';
                     tCtx.shadowBlur  = 8;
