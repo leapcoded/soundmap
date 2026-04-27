@@ -2167,8 +2167,8 @@
         const scale              = state.doc.scale;
         const metersPerWorldPx   = 1 / scale;
         const originProj         = L.CRS.EPSG3857.project(geoOrigin);
+        const { zoom, pan }      = state.ui;
 
-        // World coords → Leaflet LatLng
         function worldToLL(wx, wy) {
             const pt = L.point(
                 originProj.x + wx * metersPerWorldPx,
@@ -2177,7 +2177,6 @@
             return L.CRS.EPSG3857.unproject(pt);
         }
 
-        // Leaflet LatLng → world coords
         function llToWorld(ll) {
             const pt = L.CRS.EPSG3857.project(ll);
             return {
@@ -2186,27 +2185,26 @@
             };
         }
 
-        // The export always covers world (0,0) → (worldW, worldH)
-        const worldW   = eW / factor;
-        const worldH   = mapH / factor;
-        const tlLatLng = worldToLL(0, 0);
-        const brLatLng = worldToLL(worldW, worldH);
+        // Use the actual screen corners so the export covers exactly what's visible.
+        // screenToWorld accounts for the current pan/zoom correctly.
+        const { width, height } = state.ui;
+        const tlWorld  = screenToWorld(0, 0);
+        const brWorld  = screenToWorld(width, height);
+        const tlLatLng = worldToLL(tlWorld.x, tlWorld.y);
+        const brLatLng = worldToLL(brWorld.x, brWorld.y);
 
-        // Choose tile zoom: highest that Esri serves at (≤19) and covers sensibly
-        const lat0         = geoOrigin.lat;
-        const exportMPP    = metersPerWorldPx / factor;           // m per export px
-        const idealZoom    = Math.log2(
+        // Choose tile zoom that matches export resolution
+        const lat0      = geoOrigin.lat;
+        const exportMPP = metersPerWorldPx / (zoom * factor);   // m per export px
+        const idealZoom = Math.log2(
             156543.03392 * Math.cos(lat0 * Math.PI / 180) / exportMPP
         );
-        const tileZoom     = Math.min(19, Math.max(14, Math.round(idealZoom)));
-        // Tile size in export pixels — must use the Mercator tile width
-        // (2πR / 2^z metres) to match llToWorld() which operates in Mercator metres.
-        // The geographic formula 156543×cos(lat) gives a different (smaller) value
-        // because it accounts for Mercator stretching; using it here causes gaps.
-        const mercatorTileWidth = (2 * Math.PI * 6378137) / Math.pow(2, tileZoom);
-        const tileExportSz      = mercatorTileWidth / metersPerWorldPx * factor;
+        const tileZoom  = Math.min(19, Math.max(14, Math.round(idealZoom)));
 
-        // Lat/lng → integer tile coords at zoom z
+        // Tile size in export pixels — Mercator width × zoom (screen pixels) × factor (→ export)
+        const mercatorTileWidth = (2 * Math.PI * 6378137) / Math.pow(2, tileZoom);
+        const tileExportSz      = mercatorTileWidth / metersPerWorldPx * zoom * factor;
+
         function llToTileXY(ll, z) {
             const n      = Math.pow(2, z);
             const latRad = ll.lat * Math.PI / 180;
@@ -2216,7 +2214,6 @@
             };
         }
 
-        // Top-left lat/lng of a tile
         function tileTopLeft(tx, ty, z) {
             const n   = Math.pow(2, z);
             const lng = tx / n * 360 - 180;
@@ -2227,17 +2224,16 @@
         const tlTile = llToTileXY(tlLatLng, tileZoom);
         const brTile = llToTileXY(brLatLng, tileZoom);
 
-        // Fetch all needed tiles in parallel
         const promises = [];
         for (let tx = tlTile.x; tx <= brTile.x; tx++) {
             for (let ty = tlTile.y; ty <= brTile.y; ty++) {
                 const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tileZoom}/${ty}/${tx}`;
                 promises.push(new Promise(resolve => {
-                    const img      = new Image();
+                    const img       = new Image();
                     img.crossOrigin = 'anonymous';
-                    img.onload     = () => resolve({ img, tx, ty });
-                    img.onerror    = () => resolve(null);
-                    img.src        = url;
+                    img.onload      = () => resolve({ img, tx, ty });
+                    img.onerror     = () => resolve(null);
+                    img.src         = url;
                 }));
             }
         }
@@ -2249,8 +2245,9 @@
             const { img, tx, ty } = tile;
             const tileLL    = tileTopLeft(tx, ty, tileZoom);
             const tileWorld = llToWorld(tileLL);
-            const ex        = tileWorld.x * factor;
-            const ey        = hH + tileWorld.y * factor;
+            // World → screen → export (same transform used for all items)
+            const ex        = (tileWorld.x * zoom + pan.x) * factor;
+            const ey        = hH + (tileWorld.y * zoom + pan.y) * factor;
             tCtx.drawImage(img, ex, ey, tileExportSz, tileExportSz);
         }
     }
@@ -2350,12 +2347,14 @@
             tCtx.globalAlpha = 1.0;
         }
 
-        // Heatmap
+        // Heatmap — convert export pixels to world coords via the current viewport
+        // (screenToWorld handles pan/zoom correctly in both satellite and normal mode).
         const scheme = INTENSITY_SCHEMES[state.doc.scheme];
         const floor  = state.doc.noiseFloor;
         for (let x = 0; x < eW; x += EXPORT_HEATMAP_STEP) {
             for (let y = 0; y < mapH; y += EXPORT_HEATMAP_STEP) {
-                const db = calculateTotalDb(x / factor, y / factor);
+                const { x: wx, y: wy } = screenToWorld(x / factor, y / factor);
+                const db = calculateTotalDb(wx, wy);
                 if (db > floor + 1) {
                     tCtx.fillStyle = scheme(db, 0.4);
                     tCtx.fillRect(x, hH + y, EXPORT_HEATMAP_STEP + 1, EXPORT_HEATMAP_STEP + 1);
@@ -2363,11 +2362,18 @@
             }
         }
 
-        // Items
+        // Items — positions derived from world→screen→export, matching the live canvas view.
+        const vZoom = state.ui.zoom;
+        const vPan  = state.ui.pan;
+        function wToEX(wx) { return (wx * vZoom + vPan.x) * factor; }
+        function wToEY(wy) { return hH + (wy * vZoom + vPan.y) * factor; }
+        function wSzToE(s)  { return s  * vZoom * factor; }
+
         for (const item of state.doc.items) {
-            const cx = (item.x + (item.w ? item.w / 2 : 0)) * factor;
-            const cy = hH + (item.y + (item.h ? item.h / 2 : 0)) * factor;
-            const w  = (item.w || 0) * factor, h = (item.h || 0) * factor;
+            const cx = wToEX(item.x + (item.w ? item.w / 2 : 0));
+            const cy = wToEY(item.y + (item.h ? item.h / 2 : 0));
+            const w  = wSzToE(item.w || 0);
+            const h  = wSzToE(item.h || 0);
             tCtx.save();
             tCtx.translate(cx, cy);
             tCtx.rotate(item.angle * Math.PI / 180);
@@ -2920,11 +2926,13 @@
             );
             const results = await resp.json();
             if (results.length) {
-                leafletMap.setView([parseFloat(results[0].lat), parseFloat(results[0].lon)], 17);
-                // Re-anchor geo origin to new view centre (existing items will shift)
-                geoOrigin = leafletMap.containerPointToLatLng(
-                    L.point(state.ui.pan.x, state.ui.pan.y)
-                );
+                const lat = parseFloat(results[0].lat);
+                const lon = parseFloat(results[0].lon);
+                leafletMap.setView([lat, lon], 17);
+                // Anchor world (0,0) to the searched location so items placed
+                // here have small, sensible world coordinates.
+                geoOrigin = L.latLng(lat, lon);
+                syncCanvasFromLeaflet();
                 toast(results[0].display_name.split(',').slice(0, 2).join(', '));
             } else {
                 toast('Location not found', true);
