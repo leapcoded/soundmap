@@ -1260,7 +1260,7 @@
             } else {
                 const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
                 const isExclusion = o.isExclusion;
-                const dbV = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                const dbV = isExclusion ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
 
                 const cfg = ZONE_CONFIG[o.type] || { color: canvasColors.text3 };
                 const zoneColor = o.customColor ?? cfg.color;
@@ -1283,7 +1283,7 @@
 
                 ctx.font = '500 11px "JetBrains Mono"';
                 ctx.textAlign = 'right';
-                if (isCanopy || isExclusion) {
+                if (isExclusion) {
                     ctx.fillStyle = canvasColors.text3;
                     ctx.fillText('—', panelW - 12, y);
                 } else {
@@ -2718,7 +2718,7 @@
                 const ry          = tY + tHeadH + i * tRowH + tRowH / 2;
                 const isCanopy    = MATERIAL_PRESETS[o.material]?.type === 'canopy';
                 const isExclusion = o.isExclusion;
-                const dbV         = (isCanopy || isExclusion) ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
+                const dbV         = isExclusion ? null : calculateTotalDb(o.x + o.w / 2, o.y + o.h / 2);
                 const cfg         = ZONE_CONFIG[o.type] || {};
                 const zoneColor   = o.customColor ?? cfg.color ?? t3;
 
@@ -2757,7 +2757,7 @@
                 tCtx.fillText(`${o.reflection ?? '—'}`, cRefl, ry);
 
                 tCtx.textAlign = 'right';
-                if (isCanopy || isExclusion) {
+                if (isExclusion) {
                     tCtx.fillStyle = t3;
                     tCtx.font = '400 20px "JetBrains Mono", monospace';
                     tCtx.fillText('—', cSpl, ry);
